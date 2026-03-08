@@ -210,6 +210,11 @@ function extractFromJsonLd(data, result) {
       result.temperatur = { value: val, unit: item.unitText || '°C', timestamp: item.dateModified || null };
     }
 
+    // Handle Dataset type with variableMeasured array
+    if (item['@type'] === 'Dataset' && Array.isArray(item.variableMeasured)) {
+      extractFromJsonLd(item.variableMeasured, result);
+    }
+
     // Handle nested graph items
     if (item['@graph']) extractFromJsonLd(item['@graph'], result);
   }
