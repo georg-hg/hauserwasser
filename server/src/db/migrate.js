@@ -79,6 +79,22 @@ const SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS idx_fishing_days_user_season
     ON fishing_days(user_id, season_year);
+
+  -- Jahreslizenzen (Freischaltung durch Admin)
+  CREATE TABLE IF NOT EXISTS licenses (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    season_year     INTEGER NOT NULL,
+    license_name    VARCHAR(200) NOT NULL DEFAULT 'Hauserwasser',
+    activated_at    TIMESTAMPTZ DEFAULT NOW(),
+    activated_by    UUID REFERENCES users(id),
+    revoked_at      TIMESTAMPTZ,
+    notes           TEXT,
+    UNIQUE(user_id, season_year, license_name)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_licenses_user_year
+    ON licenses(user_id, season_year);
 `;
 
 async function migrate() {

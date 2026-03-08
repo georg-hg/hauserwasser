@@ -136,4 +136,64 @@ router.get('/me', auth, async (req, res) => {
   }
 });
 
+// ── PUT /api/auth/password ────────────────────────────────
+// Passwort ändern (Self-Service)
+router.put('/password', auth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Aktuelles und neues Passwort erforderlich.' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Neues Passwort muss mindestens 8 Zeichen haben.' });
+    }
+
+    const { rows } = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User nicht gefunden.' });
+    }
+
+    const valid = await bcrypt.compare(currentPassword, rows[0].password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: 'Aktuelles Passwort ist falsch.' });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 12);
+    await pool.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [newHash, req.user.id]);
+
+    res.json({ message: 'Passwort erfolgreich geändert.' });
+  } catch (err) {
+    console.error('Password change error:', err);
+    res.status(500).json({ error: 'Passwortänderung fehlgeschlagen.' });
+  }
+});
+
+// ── GET /api/auth/license ────────────────────────────────────
+// Aktuelle Lizenz-Info für eingeloggten User
+router.get('/license', auth, async (req, res) => {
+  try {
+    const year = new Date().getFullYear();
+    const { rows } = await pool.query(`
+      SELECT id, season_year, license_name, activated_at, revoked_at
+      FROM licenses
+      WHERE user_id = $1 AND season_year = $2 AND revoked_at IS NULL
+      ORDER BY activated_at DESC
+    `, [req.user.id, year]);
+
+    res.json({
+      licenses: rows.map(r => ({
+        id: r.id,
+        seasonYear: r.season_year,
+        licenseName: r.license_name,
+        activatedAt: r.activated_at,
+        active: !r.revoked_at,
+      })),
+    });
+  } catch (err) {
+    console.error('License check error:', err);
+    res.status(500).json({ error: 'Fehler beim Laden der Lizenz.' });
+  }
+});
+
 module.exports = router;

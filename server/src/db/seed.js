@@ -1,4 +1,5 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
+const bcrypt = require('bcryptjs');
 const pool = require('../config/db');
 
 /**
@@ -96,6 +97,21 @@ async function seed() {
     }
 
     console.log(`✓ ${SEASONS.length} Schonzeiten eingetragen.`);
+
+    // Admin-User anlegen (idempotent)
+    const adminEmail = 'hauserwasser@gmail.com';
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [adminEmail]);
+    if (existing.rows.length === 0) {
+      const pwHash = await bcrypt.hash('hauser2026wasser', 12);
+      await pool.query(
+        `INSERT INTO users (email, password_hash, first_name, last_name, role)
+         VALUES ($1, $2, 'Admin', 'Hauserwasser', 'admin')`,
+        [adminEmail, pwHash]
+      );
+      console.log('✓ Admin-User angelegt (hauserwasser@gmail.com).');
+    } else {
+      console.log('✓ Admin-User existiert bereits.');
+    }
   } catch (err) {
     console.error('✗ Seed fehlgeschlagen:', err.message);
     process.exit(1);

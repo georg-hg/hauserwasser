@@ -1,0 +1,124 @@
+export default function AdminFisherList({ fishers, onToggleLicense, onSelectFisher, onExportFisher, currentYear }) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      {/* Desktop Table */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Fischer</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">E-Mail</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Karten-Nr.</th>
+              <th className="text-center px-4 py-3 font-medium text-gray-600">Fänge {currentYear}</th>
+              <th className="text-center px-4 py-3 font-medium text-gray-600">Lizenz {currentYear}</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {fishers.map((f) => (
+              <tr key={f.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3 font-medium text-gray-900">
+                  {f.lastName} {f.firstName}
+                </td>
+                <td className="px-4 py-3 text-gray-600">{f.email}</td>
+                <td className="px-4 py-3 text-gray-600">{f.fisherCardNr || '—'}</td>
+                <td className="px-4 py-3 text-center">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                    {f.catchCount}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <button
+                    onClick={() => onToggleLicense(f.id, !!f.license)}
+                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      f.license
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                        : 'bg-red-100 text-red-600 hover:bg-red-200'
+                    }`}
+                  >
+                    {f.license ? (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        Aktiv
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                        Nicht freigeschaltet
+                      </>
+                    )}
+                  </button>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => onSelectFisher(f)}
+                      className="text-primary-600 hover:text-primary-800 text-xs font-medium"
+                    >
+                      Fangbuch
+                    </button>
+                    <button
+                      onClick={() => onExportFisher(f)}
+                      className="text-green-600 hover:text-green-800 text-xs font-medium"
+                    >
+                      Excel
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile Cards */}
+      <div className="md:hidden divide-y divide-gray-100">
+        {fishers.map((f) => (
+          <div key={f.id} className="p-4 space-y-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-medium text-gray-900">{f.lastName} {f.firstName}</p>
+                <p className="text-xs text-gray-500">{f.email}</p>
+              </div>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                {f.catchCount} Fänge
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => onToggleLicense(f.id, !!f.license)}
+                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  f.license
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-red-100 text-red-600'
+                }`}
+              >
+                {f.license ? 'Lizenz aktiv' : 'Nicht freigeschaltet'}
+              </button>
+
+              <div className="flex gap-3">
+                <button onClick={() => onSelectFisher(f)} className="text-primary-600 text-xs font-medium">
+                  Fangbuch
+                </button>
+                <button onClick={() => onExportFisher(f)} className="text-green-600 text-xs font-medium">
+                  Excel
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {fishers.length === 0 && (
+        <div className="p-8 text-center text-gray-400">
+          Noch keine Fischer registriert.
+        </div>
+      )}
+    </div>
+  );
+}

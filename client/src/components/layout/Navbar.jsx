@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
-const NAV_ITEMS = [
+const FISHER_ITEMS = [
   { path: '/', label: 'Dashboard' },
   { path: '/fang/neu', label: 'Neuer Fang' },
   { path: '/fangbuch', label: 'Fangbuch' },
@@ -10,9 +10,15 @@ const NAV_ITEMS = [
   { path: '/regeln', label: 'Regeln' },
 ];
 
+const ADMIN_ITEMS = [
+  { path: '/admin', label: 'Admin' },
+];
+
 export default function Navbar() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const isAdmin = user?.role === 'admin';
+  const navItems = isAdmin ? [...FISHER_ITEMS, ...ADMIN_ITEMS] : FISHER_ITEMS;
 
   return (
     <nav className="bg-primary-700 text-white shadow-lg sticky top-0 z-50">
@@ -30,14 +36,16 @@ export default function Navbar() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-1">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   location.pathname === item.path
                     ? 'bg-white/20 text-white'
-                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                    : item.path === '/admin'
+                      ? 'text-amber-300 hover:text-amber-200 hover:bg-white/10'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
                 }`}
               >
                 {item.label}
@@ -47,9 +55,12 @@ export default function Navbar() {
 
           {/* User */}
           <div className="flex items-center gap-3">
-            <span className="hidden sm:inline text-sm text-white/80">
+            <Link
+              to="/profil"
+              className="hidden sm:inline text-sm text-white/80 hover:text-white transition-colors"
+            >
               {user?.firstName}
-            </span>
+            </Link>
             <button
               onClick={logout}
               className="text-sm text-white/70 hover:text-white transition-colors"

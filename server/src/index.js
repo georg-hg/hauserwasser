@@ -39,6 +39,7 @@ app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/catches', require('./routes/catches.routes'));
 app.use('/api/seasons', require('./routes/seasons.routes'));
 app.use('/api/fish-id', require('./routes/fish-id.routes'));
+app.use('/api/admin', require('./routes/admin.routes'));
 
 // ── Error handler ──────────────────────────────────────────
 app.use((err, req, res, next) => {

@@ -13,13 +13,13 @@ const REVIER = {
     label: 'Obergrenze (ehem. Lindlmair-Infang)',
   },
   untergrenze: {
-    position: { lat: 48.1345, lng: 14.2210 },
+    position: { lat: 48.13057441233753, lng: 14.225871043583517 },
     label: 'Untergrenze (50m ob. Obermuehlwehr)',
     flussKm: 17.070,
     regKm: 13.472,
   },
-  center: { lat: 48.126, lng: 14.216 },
-  bounds: { north: 48.138, south: 48.114, east: 14.230, west: 14.200 },
+  center: { lat: 48.124, lng: 14.218 },
+  bounds: { north: 48.134, south: 48.114, east: 14.230, west: 14.200 },
 };
 
 const containerStyle = { width: '100%', height: '100%' };

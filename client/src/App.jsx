@@ -10,6 +10,8 @@ import Regulations from './components/knowledge/Regulations';
 import ClosedSeasons from './components/knowledge/ClosedSeasons';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
+import AdminDashboard from './components/admin/AdminDashboard';
+import Profile from './components/profile/Profile';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -21,6 +23,20 @@ function ProtectedRoute({ children }) {
     );
   }
   return user ? children : <Navigate to="/login" />;
+}
+
+function AdminRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" />;
+  if (user.role !== 'admin') return <Navigate to="/" />;
+  return children;
 }
 
 export default function App() {
@@ -43,6 +59,10 @@ export default function App() {
           <Route path="/erkennung" element={<ProtectedRoute><ImageUpload /></ProtectedRoute>} />
           <Route path="/regeln" element={<ProtectedRoute><Regulations /></ProtectedRoute>} />
           <Route path="/schonzeiten" element={<ProtectedRoute><ClosedSeasons /></ProtectedRoute>} />
+          <Route path="/profil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+
+          {/* Admin */}
+          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" />} />
