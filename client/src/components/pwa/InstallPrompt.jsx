@@ -7,7 +7,7 @@ export default function InstallPrompt() {
   const [showIosHint, setShowIosHint] = useState(false);
 
   useEffect(() => {
-    // Check if already installed
+    // Check if already installed as standalone PWA
     if (window.matchMedia('(display-mode: standalone)').matches) return;
     if (window.navigator.standalone === true) return;
 
@@ -16,17 +16,17 @@ export default function InstallPrompt() {
     const isiOS = /iphone|ipad|ipod/.test(ua) && !window.MSStream;
     setIsIos(isiOS);
 
-    // Check if dismissed recently
+    // Check if dismissed recently (only 24h now, was 7 days)
     const dismissed = localStorage.getItem('hw_pwa_dismissed');
     if (dismissed) {
       const dismissedAt = parseInt(dismissed, 10);
-      if (Date.now() - dismissedAt < 7 * 24 * 60 * 60 * 1000) return; // 7 days
+      if (Date.now() - dismissedAt < 24 * 60 * 60 * 1000) return;
     }
 
     if (isiOS) {
-      // Show iOS install hint after 3 seconds
-      const timer = setTimeout(() => setShowIosHint(true), 3000);
-      return () => clearTimeout(timer);
+      // Show iOS install hint immediately (was 3s delay)
+      setShowIosHint(true);
+      return;
     }
 
     // Android/Desktop: listen for beforeinstallprompt
@@ -36,17 +36,25 @@ export default function InstallPrompt() {
       setShowBanner(true);
     };
     window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+
+    // Also show banner after short delay as fallback (some browsers fire event late)
+    const timer = setTimeout(() => setShowBanner(true), 2000);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setShowBanner(false);
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setShowBanner(false);
+      }
+      setDeferredPrompt(null);
     }
-    setDeferredPrompt(null);
   };
 
   const handleDismiss = () => {
@@ -55,37 +63,50 @@ export default function InstallPrompt() {
     localStorage.setItem('hw_pwa_dismissed', Date.now().toString());
   };
 
-  // Android/Desktop install banner
-  if (showBanner) {
+  // ── Android/Desktop: grosser Install-Banner ──
+  if (showBanner && deferredPrompt) {
     return (
-      <div className="fixed bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm z-50 animate-slide-up">
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
-          <div className="flex items-start gap-3">
-            <img src="/icons/icon-96x96.png" alt="" className="w-12 h-12 rounded-xl" />
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-900 text-sm">Hauserwasser installieren</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Fangbuch direkt am Homescreen – schneller Zugriff, auch offline.
-              </p>
+      <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        {/* Backdrop */}
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" onClick={handleDismiss} />
+
+        <div className="relative mx-3 mb-3 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+          {/* Dismiss X */}
+          <button
+            onClick={handleDismiss}
+            className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 active:bg-gray-200"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Content */}
+          <div className="px-5 pt-5 pb-4">
+            <div className="flex items-center gap-4 mb-4">
+              <img src="/icons/icon-96x96.png" alt="Hauserwasser" className="w-16 h-16 rounded-2xl shadow-md" />
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Hauserwasser</h3>
+                <p className="text-sm text-gray-500">Digitales Fangbuch</p>
+              </div>
             </div>
-            <button onClick={handleDismiss} className="text-gray-400 hover:text-gray-600 p-1 -mt-1 -mr-1">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={handleDismiss}
-              className="flex-1 px-3 py-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              Spaeter
-            </button>
+            <p className="text-sm text-gray-600 mb-5">
+              Installiere die App am Homescreen fuer schnellen Zugriff auf dein Fangbuch, Wetter- und Gewaesserdaten – auch offline verfuegbar.
+            </p>
+
+            {/* Grosser Install-Button */}
             <button
               onClick={handleInstall}
-              className="flex-1 px-3 py-2 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+              className="w-full py-4 text-base font-bold text-white bg-primary-600 rounded-xl active:bg-primary-700 transition-colors shadow-lg shadow-primary-600/30"
             >
-              Installieren
+              App installieren
+            </button>
+
+            <button
+              onClick={handleDismiss}
+              className="w-full py-3 mt-2 text-sm font-medium text-gray-500 active:text-gray-700 transition-colors"
+            >
+              Nicht jetzt
             </button>
           </div>
         </div>
@@ -93,27 +114,80 @@ export default function InstallPrompt() {
     );
   }
 
-  // iOS install hint
+  // ── iOS: Schritt-fuer-Schritt Anleitung ──
   if (showIosHint && isIos) {
     return (
-      <div className="fixed bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm z-50 animate-slide-up">
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
-          <div className="flex items-start gap-3">
-            <img src="/icons/icon-96x96.png" alt="" className="w-12 h-12 rounded-xl" />
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-900 text-sm">Zum Homescreen hinzufuegen</p>
-              <p className="text-xs text-gray-500 mt-1">
-                Tippe auf{' '}
-                <svg className="inline w-4 h-4 text-blue-500 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-                {' '}und dann <strong>&quot;Zum Home-Bildschirm&quot;</strong>.
-              </p>
+      <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        {/* Backdrop */}
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" onClick={handleDismiss} />
+
+        <div className="relative mx-3 mb-3 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+          {/* Dismiss X */}
+          <button
+            onClick={handleDismiss}
+            className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 active:bg-gray-200"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          {/* Content */}
+          <div className="px-5 pt-5 pb-5">
+            <div className="flex items-center gap-4 mb-4">
+              <img src="/icons/icon-96x96.png" alt="Hauserwasser" className="w-16 h-16 rounded-2xl shadow-md" />
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Hauserwasser installieren</h3>
+                <p className="text-sm text-gray-500">In 2 Schritten zur App</p>
+              </div>
             </div>
-            <button onClick={handleDismiss} className="text-gray-400 hover:text-gray-600 p-1 -mt-1 -mr-1">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+
+            {/* Step 1 */}
+            <div className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl mb-3">
+              <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-lg font-bold flex-shrink-0">
+                1
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">
+                  Tippe unten auf{' '}
+                  <svg className="inline w-6 h-6 text-blue-600 -mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  {' '}Teilen
+                </p>
+              </div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl mb-4">
+              <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-lg font-bold flex-shrink-0">
+                2
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-900">
+                  Waehle{' '}
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded-md border border-gray-200 text-sm">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Zum Home-Bildschirm
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            {/* Arrow pointing down to Safari share button */}
+            <div className="flex justify-center mb-2">
+              <svg className="w-8 h-8 text-blue-500 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
               </svg>
+            </div>
+
+            <button
+              onClick={handleDismiss}
+              className="w-full py-3 text-sm font-medium text-gray-500 active:text-gray-700 transition-colors"
+            >
+              Verstanden
             </button>
           </div>
         </div>

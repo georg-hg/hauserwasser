@@ -51,9 +51,6 @@ export default function Dashboard() {
       {/* Quoten-Warnung */}
       {stats && <QuotaTracker stats={stats} />}
 
-      {/* Wetter Piberbach (aktuell + 3 Tage) */}
-      <WeatherWidget />
-
       {/* Aktuell befischbare Arten */}
       <SeasonalFish />
 
@@ -74,6 +71,9 @@ export default function Dashboard() {
           height="h-[300px] md:h-[450px]"
         />
       </div>
+
+      {/* Wetter Piberbach (aktuell + 3 Tage) */}
+      <WeatherWidget />
 
       {/* Letzte Faenge */}
       {catches.length > 0 && (
