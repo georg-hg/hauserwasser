@@ -4,6 +4,8 @@ import { useGeolocation } from '../../hooks/useGeolocation';
 import MapComponent from '../map/MapComponent';
 import QuotaTracker from './QuotaTracker';
 import StatsCard from './StatsCard';
+import WaterWidget from './WaterWidget';
+import SeasonalFish from './SeasonalFish';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -22,9 +24,9 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Statistik-Karten */}
+      {/* Statistik-Karten (3 statt 4 – ohne Hecht/Zander) */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <StatsCard
             label="Fischtage"
             value={stats.fishingDays.total}
@@ -42,16 +44,17 @@ export default function Dashboard() {
             value={stats.totals?.total || 0}
             sub={`${stats.totals?.kept || 0} entnom. / ${stats.totals?.released || 0} zurueck`}
           />
-          <StatsCard
-            label="Hecht/Zander"
-            value={`${stats.quotas.pikeKept}/${stats.quotas.zanderKept}`}
-            sub="je max. 1/Jahr"
-          />
         </div>
       )}
 
       {/* Quoten-Warnung */}
       {stats && <QuotaTracker stats={stats} />}
+
+      {/* Aktuell befischbare Arten */}
+      <SeasonalFish />
+
+      {/* Gewässerdaten Krems (Pegelstand, Durchfluss, Temperatur) */}
+      <WaterWidget />
 
       {/* Karte mit allen Faengen */}
       <div className="card p-0 overflow-hidden">

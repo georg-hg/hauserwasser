@@ -82,9 +82,22 @@ export default function MapComponent({
       icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#EF4444', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 14 },
     });
 
-    // Untergrenze
+    // Untergrenze – rote Linie quer über den Fluss (analog zu OG)
+    const ugPos = REVIER.untergrenze.position;
+    const ugOffset = 0.00025; // ca. 25m Querversatz für Flusslinie
+    const ugPoint1 = { lat: ugPos.lat - ugOffset * 0.3, lng: ugPos.lng - ugOffset };
+    const ugPoint2 = { lat: ugPos.lat + ugOffset * 0.3, lng: ugPos.lng + ugOffset };
+
+    new google.maps.Polyline({
+      path: [ugPoint1, ugPoint2],
+      strokeColor: '#EF4444',
+      strokeOpacity: 0.9,
+      strokeWeight: 4,
+      map: mapInstance,
+    });
+
     new google.maps.Marker({
-      position: REVIER.untergrenze.position, map: mapInstance,
+      position: ugPos, map: mapInstance,
       label: { text: 'UG', color: '#fff', fontWeight: 'bold', fontSize: '11px' },
       title: REVIER.untergrenze.label,
       icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#EF4444', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 14 },
