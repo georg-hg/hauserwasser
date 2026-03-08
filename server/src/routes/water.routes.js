@@ -33,19 +33,18 @@ function parseWaterData(html) {
     // continue to other strategies
   }
 
-  // Strategy 2: JSON-LD structured data
-  if (!result.pegel && !result.temperatur) {
-    try {
-      const jsonLdBlocks = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi) || [];
-      for (const block of jsonLdBlocks) {
-        const jsonStr = block.replace(/<\/?script[^>]*>/gi, '').trim();
-        try {
-          const data = JSON.parse(jsonStr);
-          extractFromJsonLd(data, result);
-        } catch {}
-      }
-    } catch {}
-  }
+  // Strategy 2: JSON-LD structured data (most accurate, always try)
+  try {
+    const jsonLdBlocks = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi) || [];
+    for (const block of jsonLdBlocks) {
+      const jsonStr = block.replace(/<\/?script[^>]*>/gi, '').trim();
+      try {
+        const data = JSON.parse(jsonStr);
+        // JSON-LD is authoritative — allow overwriting previous values
+        extractFromJsonLd(data, result, true);
+      } catch {}
+    }
+  } catch {}
 
   // Strategy 3: Regex extraction from rendered HTML/embedded data
   if (!result.pegel) {
@@ -194,30 +193,29 @@ function extractFromNextData(obj, result) {
 /**
  * Extract from JSON-LD schema.org data
  */
-function extractFromJsonLd(data, result) {
+function extractFromJsonLd(data, result, overwrite = false) {
   const items = Array.isArray(data) ? data : [data];
   for (const item of items) {
+    // Handle Dataset type with variableMeasured array
+    if (item && item['@type'] === 'Dataset' && Array.isArray(item.variableMeasured)) {
+      extractFromJsonLd(item.variableMeasured, result, overwrite);
+    }
+
+    // Handle nested graph items
+    if (item && item['@graph']) extractFromJsonLd(item['@graph'], result, overwrite);
+
     if (!item || !item.name) continue;
     const name = item.name.toLowerCase();
     const val = parseFloat(item.value);
     if (isNaN(val)) continue;
 
-    if (!result.pegel && (name.includes('pegel') || name.includes('wasserstand') || name.includes('water level'))) {
+    if ((overwrite || !result.pegel) && (name.includes('pegel') || name.includes('wasserstand') || name.includes('water level'))) {
       result.pegel = { value: val, unit: item.unitText || 'cm', timestamp: item.dateModified || null };
-    } else if (!result.durchfluss && (name.includes('durchfluss') || name.includes('discharge') || name.includes('abfluss'))) {
+    } else if ((overwrite || !result.durchfluss) && (name.includes('durchfluss') || name.includes('discharge') || name.includes('abfluss'))) {
       result.durchfluss = { value: val, unit: item.unitText || 'm³/s', timestamp: item.dateModified || null };
-    } else if (!result.temperatur && (name.includes('temperatur') || name.includes('temperature'))) {
+    } else if ((overwrite || !result.temperatur) && (name.includes('temperatur') || name.includes('temperature'))) {
       result.temperatur = { value: val, unit: item.unitText || '°C', timestamp: item.dateModified || null };
     }
-
-    // Handle Dataset type with variableMeasured array
-    if (item['@type'] === 'Dataset' && Array.isArray(item.variableMeasured)) {
-      extractFromJsonLd(item.variableMeasured, result);
-    }
-
-    // Handle nested graph items
-    if (item['@graph']) extractFromJsonLd(item['@graph'], result);
-  }
 }
 
 async function fetchStation(stationId) {
