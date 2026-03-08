@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL
+  ? `https://${import.meta.env.VITE_API_URL}`
+  : '';
 
 function TrendIcon({ trend }) {
   if (!trend) return null;
@@ -76,7 +78,7 @@ export default function WaterWidget() {
 
     async function fetchWater() {
       try {
-        const res = await fetch(`${API}/water`);
+        const res = await fetch(`${API_URL}/api/water`);
         if (!res.ok) throw new Error();
         const json = await res.json();
         if (mounted) setData(json);

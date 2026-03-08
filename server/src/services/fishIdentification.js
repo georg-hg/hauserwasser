@@ -35,8 +35,7 @@ const LATIN_MAPPING = {
 };
 
 /**
- * Fisch erkennen – nutzt iNaturalist Computer Vision API als Fallback
- * In Produktion: TensorFlow.js-Modell oder Azure Custom Vision einbinden
+ * Fisch erkennen – nutzt iNaturalist Computer Vision API
  */
 async function identifyFish(imagePath) {
   try {
@@ -46,25 +45,25 @@ async function identifyFish(imagePath) {
       .jpeg({ quality: 85 })
       .toBuffer();
 
-    // iNaturalist Score Image API
-    const FormData = (await import('form-data')).default;
-    const form = new FormData();
-    form.append('image', resizedBuffer, {
-      filename: 'fish.jpg',
-      contentType: 'image/jpeg',
-    });
+    // Use native Node.js FormData and Blob (Node 18+)
+    const formData = new FormData();
+    const blob = new Blob([resizedBuffer], { type: 'image/jpeg' });
+    formData.append('image', blob, 'fish.jpg');
+
+    console.log('[Fish-ID] Sending image to iNaturalist API...');
 
     const response = await fetch(
       'https://api.inaturalist.org/v1/computervisions/score_image',
       {
         method: 'POST',
-        body: form,
-        headers: form.getHeaders(),
+        body: formData,
+        signal: AbortSignal.timeout(15000),
       }
     );
 
     if (!response.ok) {
-      console.warn('iNaturalist API Status:', response.status);
+      const errorText = await response.text().catch(() => '');
+      console.warn('[Fish-ID] iNaturalist API Status:', response.status, errorText.substring(0, 200));
       return fallbackResult();
     }
 
@@ -80,6 +79,8 @@ async function identifyFish(imagePath) {
         const top = fishResults[0];
         const mapped = mapToLocal(top.taxon?.name);
 
+        console.log(`[Fish-ID] Identified: ${mapped.german} (${top.taxon?.name}) - confidence: ${top.combined_score}`);
+
         return {
           species: mapped.key,
           speciesGerman: mapped.german,
@@ -93,17 +94,19 @@ async function identifyFish(imagePath) {
           })),
         };
       }
+
+      console.log('[Fish-ID] No fish results in iNaturalist response');
     }
 
     return fallbackResult();
   } catch (err) {
-    console.error('Fish identification error:', err.message);
+    console.error('[Fish-ID] Error:', err.message);
     return fallbackResult();
   }
 }
 
 /**
- * iNaturalist Latin-Name auf lokale Hauerwasser-Art mappen
+ * iNaturalist Latin-Name auf lokale Hauserwasser-Art mappen
  */
 function mapToLocal(latinName) {
   if (!latinName) return { key: 'unknown', german: 'Unbekannt' };
