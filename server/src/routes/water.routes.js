@@ -300,12 +300,26 @@ router.get('/debug', async (req, res) => {
     const pegelSnippet = extractSnippet(html, /pegel/i, 200);
     const tempSnippet = extractSnippet(html, /temperatur/i, 200);
 
+    // Extract raw JSON-LD blocks for debugging
+    const jsonLdRaw = [];
+    const jsonLdBlocks = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi) || [];
+    for (const block of jsonLdBlocks) {
+      const jsonStr = block.replace(/<\/?script[^>]*>/gi, '').trim();
+      try {
+        jsonLdRaw.push(JSON.parse(jsonStr));
+      } catch (e) {
+        jsonLdRaw.push({ parseError: e.message, raw: jsonStr.substring(0, 500) });
+      }
+    }
+
     const parsed = parseWaterData(html);
 
     res.json({
       htmlLength: html.length,
       hasNextData,
       hasJsonLd,
+      jsonLdBlockCount: jsonLdBlocks.length,
+      jsonLdRaw,
       hasPegel,
       hasTemperatur,
       pegelSnippet,
