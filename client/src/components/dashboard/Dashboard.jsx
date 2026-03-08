@@ -5,6 +5,7 @@ import MapComponent from '../map/MapComponent';
 import QuotaTracker from './QuotaTracker';
 import StatsCard from './StatsCard';
 import WaterWidget from './WaterWidget';
+import WeatherWidget from './WeatherWidget';
 import SeasonalFish from './SeasonalFish';
 
 export default function Dashboard() {
@@ -49,6 +50,9 @@ export default function Dashboard() {
 
       {/* Quoten-Warnung */}
       {stats && <QuotaTracker stats={stats} />}
+
+      {/* Wetter Piberbach (aktuell + 3 Tage) */}
+      <WeatherWidget />
 
       {/* Aktuell befischbare Arten */}
       <SeasonalFish />

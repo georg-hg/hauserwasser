@@ -12,6 +12,7 @@ import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import AdminDashboard from './components/admin/AdminDashboard';
 import Profile from './components/profile/Profile';
+import InstallPrompt from './components/pwa/InstallPrompt';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -70,6 +71,7 @@ export default function App() {
       </main>
 
       {user && <MobileNav />}
+      {user && <InstallPrompt />}
     </div>
   );
 }
