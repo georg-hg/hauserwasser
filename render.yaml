@@ -36,7 +36,6 @@ services:
   - type: web
     name: hauserwasser-client
     runtime: static
-    region: frankfurt
     buildCommand: cd client && npm install && npm run build
     staticPublishPath: client/dist
     headers:
