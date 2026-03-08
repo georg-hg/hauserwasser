@@ -25,20 +25,14 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Statistik-Karten (3 statt 4 – ohne Hecht/Zander) */}
+      {/* Statistik-Karten */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <StatsCard
             label="Fischtage"
             value={stats.fishingDays.total}
             max={stats.fishingDays.maxSeason}
             sub={`${stats.fishingDays.thisWeek}/3 diese Woche`}
-          />
-          <StatsCard
-            label="Salmoniden"
-            value={stats.quotas.salmonidsKept}
-            max={stats.quotas.salmonidsMax}
-            sub="entnommen"
           />
           <StatsCard
             label="Gesamtfaenge"
