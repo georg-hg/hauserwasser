@@ -216,6 +216,7 @@ function extractFromJsonLd(data, result, overwrite = false) {
     } else if ((overwrite || !result.temperatur) && (name.includes('temperatur') || name.includes('temperature'))) {
       result.temperatur = { value: val, unit: item.unitText || '°C', timestamp: item.dateModified || null };
     }
+  }
 }
 
 async function fetchStation(stationId) {
