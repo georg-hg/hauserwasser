@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 import Navbar from './components/layout/Navbar';
 import MobileNav from './components/layout/MobileNav';
@@ -40,11 +41,20 @@ function AdminRoute({ children }) {
   return children;
 }
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
 export default function App() {
   const { user } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <ScrollToTop />
       {user && <Navbar />}
 
       <main className={user ? 'pb-20 md:pb-6' : ''}>
