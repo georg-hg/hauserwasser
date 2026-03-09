@@ -9,7 +9,8 @@ export default function DatenserverSection() {
   const [loading, setLoading] = useState(true);
   const [nasInfo, setNasInfo] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(''); // "2 / 5"
+  const [uploadResults, setUploadResults] = useState([]); // [{type, message}]
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -33,48 +34,61 @@ export default function DatenserverSection() {
     }
   };
 
-  const handleUpload = useCallback(async (file) => {
-    if (!file) return;
+  const handleUpload = useCallback(async (files) => {
+    if (!files || files.length === 0) return;
 
     const validExts = ['.txt', '.csv', '.xlsx', '.xls'];
-    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-    if (!validExts.includes(ext)) {
-      setUploadResult({ type: 'error', message: 'Nur .txt, .csv oder .xlsx Dateien erlaubt.' });
-      setTimeout(() => setUploadResult(null), 4000);
+    const fileList = Array.from(files);
+
+    // Alle Dateien validieren
+    const invalid = fileList.filter(f => {
+      const ext = f.name.substring(f.name.lastIndexOf('.')).toLowerCase();
+      return !validExts.includes(ext);
+    });
+    if (invalid.length > 0) {
+      setUploadResults([{ type: 'error', message: `Ungültige Dateien: ${invalid.map(f => f.name).join(', ')}. Nur .txt, .csv oder .xlsx erlaubt.` }]);
+      setTimeout(() => setUploadResults([]), 5000);
       return;
     }
 
     setUploading(true);
-    setUploadResult(null);
+    setUploadResults([]);
+    const results = [];
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const result = await api.upload('/api/monitoring/upload', formData);
-      setUploadResult({
-        type: 'success',
-        message: `${result.filename}: ${result.inserted} von ${result.total} Messwerten importiert.`,
-      });
-      loadData(); // Importliste aktualisieren
-    } catch (err) {
-      setUploadResult({ type: 'error', message: err.message });
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      setTimeout(() => setUploadResult(null), 6000);
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      setUploadProgress(`${i + 1} / ${fileList.length}`);
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const result = await api.upload('/api/monitoring/upload', formData);
+        results.push({
+          type: 'success',
+          message: `${result.filename}: ${result.inserted} von ${result.total} Messwerten importiert.`,
+        });
+      } catch (err) {
+        results.push({ type: 'error', message: `${file.name}: ${err.message}` });
+      }
     }
+
+    setUploadResults(results);
+    setUploadProgress('');
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    loadData();
+    setTimeout(() => setUploadResults([]), 8000);
   }, []);
 
   const handleFileSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (file) handleUpload(file);
+    const files = e.target.files;
+    if (files?.length) handleUpload(files);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleUpload(file);
+    const files = e.dataTransfer.files;
+    if (files?.length) handleUpload(files);
   };
 
   const handleDragOver = (e) => {
@@ -184,7 +198,9 @@ export default function DatenserverSection() {
           {uploading ? (
             <div className="flex flex-col items-center gap-3">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500" />
-              <p className="text-sm text-gray-600">Datei wird importiert...</p>
+              <p className="text-sm text-gray-600">
+                {uploadProgress ? `Datei ${uploadProgress} wird importiert...` : 'Wird importiert...'}
+              </p>
             </div>
           ) : (
             <>
@@ -210,6 +226,7 @@ export default function DatenserverSection() {
                   ref={fileInputRef}
                   type="file"
                   accept=".txt,.csv,.xlsx,.xls"
+                  multiple
                   onChange={handleFileSelect}
                   className="hidden"
                 />
@@ -221,20 +238,24 @@ export default function DatenserverSection() {
       )}
 
       {/* Upload Status */}
-      {uploadResult && (
-        <div className={`rounded-xl p-3 text-sm flex items-center gap-2 ${
-          uploadResult.type === 'success'
-            ? 'bg-green-50 text-green-700 border border-green-200'
-            : 'bg-red-50 text-red-700 border border-red-200'
-        }`}>
-          <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            {uploadResult.type === 'success' ? (
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-            )}
-          </svg>
-          {uploadResult.message}
+      {uploadResults.length > 0 && (
+        <div className="space-y-2">
+          {uploadResults.map((r, i) => (
+            <div key={i} className={`rounded-xl p-3 text-sm flex items-center gap-2 ${
+              r.type === 'success'
+                ? 'bg-green-50 text-green-700 border border-green-200'
+                : 'bg-red-50 text-red-700 border border-red-200'
+            }`}>
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                {r.type === 'success' ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                )}
+              </svg>
+              {r.message}
+            </div>
+          ))}
         </div>
       )}
 
