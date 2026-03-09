@@ -1,18 +1,24 @@
 import { useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
 import DatenserverSection from './DatenserverSection';
 import MonitoringSection from './MonitoringSection';
 import ProjekteckdatenSection from './ProjekteckdatenSection';
 import ProjektzielSection from './ProjektzielSection';
 
-const TABS = [
-  { id: 'datenserver', label: 'Datenserver', icon: 'M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z' },
+const ALL_TABS = [
+  { id: 'datenserver', label: 'Datenserver', adminOnly: true, icon: 'M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z' },
   { id: 'monitoring', label: 'Monitoring', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
   { id: 'eckdaten', label: 'Projekteckdaten', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
   { id: 'ziel', label: 'Projektziel', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
 ];
 
 export default function Renaturierung() {
-  const [activeTab, setActiveTab] = useState('datenserver');
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+
+  const tabs = ALL_TABS.filter(tab => !tab.adminOnly || isAdmin);
+  const defaultTab = isAdmin ? 'datenserver' : 'monitoring';
+  const [activeTab, setActiveTab] = useState(defaultTab);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
@@ -33,7 +39,7 @@ export default function Renaturierung() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 overflow-x-auto">
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -53,7 +59,7 @@ export default function Renaturierung() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'datenserver' && <DatenserverSection />}
+      {activeTab === 'datenserver' && isAdmin && <DatenserverSection />}
       {activeTab === 'monitoring' && <MonitoringSection />}
       {activeTab === 'eckdaten' && <ProjekteckdatenSection />}
       {activeTab === 'ziel' && <ProjektzielSection />}
