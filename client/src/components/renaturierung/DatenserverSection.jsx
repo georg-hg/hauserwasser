@@ -37,7 +37,7 @@ export default function DatenserverSection() {
   const handleUpload = useCallback(async (files) => {
     if (!files || files.length === 0) return;
 
-    const validExts = ['.txt', '.csv', '.xlsx', '.xls'];
+    const validExts = ['.txt', '.csv', '.xlsx', '.xls', '.zip'];
     const fileList = Array.from(files);
 
     // Alle Dateien validieren
@@ -46,7 +46,7 @@ export default function DatenserverSection() {
       return !validExts.includes(ext);
     });
     if (invalid.length > 0) {
-      setUploadResults([{ type: 'error', message: `Ungültige Dateien: ${invalid.map(f => f.name).join(', ')}. Nur .txt, .csv oder .xlsx erlaubt.` }]);
+      setUploadResults([{ type: 'error', message: `Ungültige Dateien: ${invalid.map(f => f.name).join(', ')}. Nur .txt, .csv, .xlsx oder .zip erlaubt.` }]);
       setTimeout(() => setUploadResults([]), 5000);
       return;
     }
@@ -225,13 +225,13 @@ export default function DatenserverSection() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".txt,.csv,.xlsx,.xls"
+                  accept=".txt,.csv,.xlsx,.xls,.zip"
                   multiple
                   onChange={handleFileSelect}
                   className="hidden"
                 />
               </label>
-              <p className="text-xs text-gray-400 mt-2">.txt · .csv · .xlsx</p>
+              <p className="text-xs text-gray-400 mt-2">.txt · .csv · .xlsx · .zip</p>
             </>
           )}
         </div>

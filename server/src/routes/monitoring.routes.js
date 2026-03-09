@@ -6,18 +6,20 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+const AdmZip = require('adm-zip');
+
 const router = express.Router();
 
-// Multer für CSV/Excel-Upload
+// Multer für CSV/Excel/TXT/ZIP-Upload
 const upload = multer({
   dest: path.join(__dirname, '../../uploads/monitoring'),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB (für ZIP mit mehreren Dateien)
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (['.csv', '.xlsx', '.xls', '.txt'].includes(ext)) {
+    if (['.csv', '.xlsx', '.xls', '.txt', '.zip'].includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Nur CSV/Excel/TXT-Dateien erlaubt.'));
+      cb(new Error('Nur CSV/Excel/TXT/ZIP-Dateien erlaubt.'));
     }
   },
 });
@@ -204,66 +206,121 @@ router.post('/upload', auth, requireRole('admin'), upload.single('file'), async 
 
   try {
     const ext = path.extname(req.file.originalname).toLowerCase();
-    let rows = [];
 
-    if (ext === '.csv' || ext === '.txt') {
-      rows = await parseTextFile(req.file.path);
-    } else {
-      rows = await parseExcel(req.file.path);
+    // ZIP-Datei: entpacken und alle .txt/.csv Dateien verarbeiten
+    if (ext === '.zip') {
+      const result = await processZipFile(req.file.path, req.file.originalname, req.user.id);
+      fs.unlink(req.file.path, () => {});
+      return res.json(result);
     }
 
-    if (rows.length === 0) {
-      return res.status(400).json({ error: 'Keine Daten in der Datei gefunden.' });
-    }
-
-    // Zeitraum der Daten ermitteln
-    const timestamps = rows.map(r => new Date(r.measuredAt).getTime()).filter(t => !isNaN(t));
-    const dataFrom = timestamps.length ? new Date(Math.min(...timestamps)) : null;
-    const dataTo = timestamps.length ? new Date(Math.max(...timestamps)) : null;
-
-    // Batch-Insert
-    let inserted = 0;
-    for (const row of rows) {
-      try {
-        await pool.query(`
-          INSERT INTO monitoring_data (probe_name, measured_at, ch1_ntu, ch2_mg_l, ch32_voltage)
-          VALUES ($1, $2, $3, $4, $5)
-          ON CONFLICT (probe_name, measured_at) DO UPDATE
-          SET ch1_ntu = EXCLUDED.ch1_ntu, ch2_mg_l = EXCLUDED.ch2_mg_l, ch32_voltage = EXCLUDED.ch32_voltage
-        `, [row.probe || 'Ende', row.measuredAt, row.ch1, row.ch2, row.ch32]);
-        inserted++;
-      } catch (rowErr) {
-        console.error('Row insert error:', rowErr.message, row);
-      }
-    }
-
-    // Import-Eintrag speichern
-    const probeName = rows[0]?.probe || 'Ende';
-    await pool.query(`
-      INSERT INTO monitoring_imports (filename, probe_name, records_total, records_imported, data_from, data_to, uploaded_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [req.file.originalname, probeName, rows.length, inserted, dataFrom, dataTo, req.user.id]).catch(err => {
-      console.error('Import tracking error:', err.message);
-    });
-
-    // Temp-Datei löschen
+    // Einzelne Datei verarbeiten
+    const result = await processSingleFile(req.file.path, req.file.originalname, ext, req.user.id);
     fs.unlink(req.file.path, () => {});
-
-    res.json({
-      message: `${inserted} von ${rows.length} Messwerten importiert.`,
-      inserted,
-      total: rows.length,
-      filename: req.file.originalname,
-      dataFrom,
-      dataTo,
-    });
+    res.json(result);
   } catch (err) {
     console.error('Upload error:', err);
-    // Temp-Datei löschen
     if (req.file?.path) fs.unlink(req.file.path, () => {});
-    res.status(500).json({ error: 'Fehler beim Importieren der Daten.' });
+    res.status(500).json({ error: err.message || 'Fehler beim Importieren der Daten.' });
   }
 });
+
+// ── Einzelne Datei verarbeiten ────────────────────────────────
+async function processSingleFile(filePath, filename, ext, userId) {
+  let rows = [];
+
+  if (ext === '.csv' || ext === '.txt') {
+    rows = await parseTextFile(filePath);
+  } else if (ext === '.xlsx' || ext === '.xls') {
+    rows = await parseExcel(filePath);
+  } else {
+    throw new Error(`Nicht unterstütztes Format: ${ext}`);
+  }
+
+  if (rows.length === 0) {
+    throw new Error(`Keine Daten in ${filename} gefunden.`);
+  }
+
+  const timestamps = rows.map(r => new Date(r.measuredAt).getTime()).filter(t => !isNaN(t));
+  const dataFrom = timestamps.length ? new Date(Math.min(...timestamps)) : null;
+  const dataTo = timestamps.length ? new Date(Math.max(...timestamps)) : null;
+
+  let inserted = 0;
+  for (const row of rows) {
+    try {
+      await pool.query(`
+        INSERT INTO monitoring_data (probe_name, measured_at, ch1_ntu, ch2_mg_l, ch32_voltage)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (probe_name, measured_at) DO UPDATE
+        SET ch1_ntu = EXCLUDED.ch1_ntu, ch2_mg_l = EXCLUDED.ch2_mg_l, ch32_voltage = EXCLUDED.ch32_voltage
+      `, [row.probe || 'Ende', row.measuredAt, row.ch1, row.ch2, row.ch32]);
+      inserted++;
+    } catch (rowErr) {
+      console.error('Row insert error:', rowErr.message, row);
+    }
+  }
+
+  const probeName = rows[0]?.probe || 'Ende';
+  await pool.query(`
+    INSERT INTO monitoring_imports (filename, probe_name, records_total, records_imported, data_from, data_to, uploaded_by)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+  `, [filename, probeName, rows.length, inserted, dataFrom, dataTo, userId]).catch(err => {
+    console.error('Import tracking error:', err.message);
+  });
+
+  return { message: `${inserted} von ${rows.length} Messwerten importiert.`, inserted, total: rows.length, filename, dataFrom, dataTo };
+}
+
+// ── ZIP-Datei verarbeiten ─────────────────────────────────────
+async function processZipFile(zipPath, zipFilename, userId) {
+  const zip = new AdmZip(zipPath);
+  const entries = zip.getEntries();
+
+  // Nur .txt und .csv Dateien aus dem ZIP
+  const validEntries = entries.filter(e => {
+    if (e.isDirectory) return false;
+    const entryExt = path.extname(e.entryName).toLowerCase();
+    return ['.txt', '.csv'].includes(entryExt);
+  });
+
+  if (validEntries.length === 0) {
+    throw new Error('Keine .txt oder .csv Dateien im ZIP gefunden.');
+  }
+
+  let totalInserted = 0;
+  let totalRows = 0;
+  let filesProcessed = 0;
+  const fileResults = [];
+
+  for (const entry of validEntries) {
+    const entryExt = path.extname(entry.entryName).toLowerCase();
+    const entryFilename = path.basename(entry.entryName);
+
+    // Temporäre Datei schreiben
+    const tmpPath = path.join(path.dirname(zipPath), `zip_${Date.now()}_${entryFilename}`);
+    try {
+      fs.writeFileSync(tmpPath, entry.getData());
+      const result = await processSingleFile(tmpPath, entryFilename, entryExt, userId);
+      totalInserted += result.inserted;
+      totalRows += result.total;
+      filesProcessed++;
+      fileResults.push({ file: entryFilename, inserted: result.inserted, total: result.total });
+    } catch (fileErr) {
+      fileResults.push({ file: entryFilename, error: fileErr.message });
+    } finally {
+      fs.unlink(tmpPath, () => {});
+    }
+  }
+
+  return {
+    message: `ZIP: ${filesProcessed} Dateien verarbeitet, ${totalInserted} von ${totalRows} Messwerten importiert.`,
+    inserted: totalInserted,
+    total: totalRows,
+    filename: zipFilename,
+    filesProcessed,
+    fileResults,
+  };
+}
 
 // ── Text/CSV-Parser ────────────────────────────────────────────
 // Unterstützt zwei Formate:
