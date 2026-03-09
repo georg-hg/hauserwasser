@@ -12,6 +12,7 @@ import ClosedSeasons from './components/knowledge/ClosedSeasons';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import AdminDashboard from './components/admin/AdminDashboard';
+import Renaturierung from './components/renaturierung/Renaturierung';
 import Profile from './components/profile/Profile';
 import InstallPrompt from './components/pwa/InstallPrompt';
 
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="/regeln" element={<ProtectedRoute><Regulations /></ProtectedRoute>} />
           <Route path="/schonzeiten" element={<ProtectedRoute><ClosedSeasons /></ProtectedRoute>} />
           <Route path="/profil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/renaturierung" element={<ProtectedRoute><Renaturierung /></ProtectedRoute>} />
 
           {/* Admin */}
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />

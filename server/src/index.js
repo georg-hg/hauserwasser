@@ -2,8 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 const pool = require('./config/db');
+
+// Uploads-Ordner sicherstellen
+const uploadsDir = path.join(__dirname, '../uploads/monitoring');
+fs.mkdirSync(uploadsDir, { recursive: true });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -42,6 +47,7 @@ app.use('/api/fish-id', require('./routes/fish-id.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
 app.use('/api/water', require('./routes/water.routes'));
 app.use('/api/weather', require('./routes/weather.routes'));
+app.use('/api/monitoring', require('./routes/monitoring.routes'));
 
 // ── Error handler ──────────────────────────────────────────
 app.use((err, req, res, next) => {
@@ -83,6 +89,23 @@ async function autoMigrate() {
       );
       CREATE INDEX IF NOT EXISTS idx_admin_notifications_read
         ON admin_notifications(read, created_at DESC);
+    `);
+
+    // Monitoring-Daten Tabelle (Renaturierung Krems)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS monitoring_data (
+        id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        probe_name      VARCHAR(100) NOT NULL DEFAULT 'Ende',
+        measured_at     TIMESTAMPTZ NOT NULL,
+        ch1_ntu         DECIMAL(12,4),
+        ch2_mg_l        DECIMAL(12,4),
+        ch32_voltage    DECIMAL(8,4),
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_monitoring_probe_time
+        ON monitoring_data(probe_name, measured_at);
+      CREATE INDEX IF NOT EXISTS idx_monitoring_measured
+        ON monitoring_data(measured_at DESC);
     `);
 
     console.log('✓ Auto-Migration erfolgreich.');
