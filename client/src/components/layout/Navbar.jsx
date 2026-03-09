@@ -26,11 +26,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 font-bold text-lg">
-            <svg className="w-7 h-7" viewBox="0 0 64 64" fill="none">
-              <circle cx="32" cy="32" r="30" fill="currentColor" opacity="0.2" />
-              <path d="M16 36c4-8 12-14 20-10s8 12 4 18c-2-4-6-6-10-6s-10 2-14-2z"
-                    fill="currentColor" opacity="0.6" />
-            </svg>
+            <img src="/icons/icon-96x96.png" alt="Hauserwasser" className="w-8 h-8 rounded-full" />
             <span className="hidden sm:inline">Hauserwasser</span>
           </Link>
 
