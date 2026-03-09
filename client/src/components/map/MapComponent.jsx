@@ -29,7 +29,7 @@ const containerStyle = { width: '100%', height: '100%' };
 
 const mapOptions = {
   mapTypeId: 'satellite',
-  mapTypeControl: true,
+  mapTypeControl: false,
   zoomControl: true,
   streetViewControl: false,
   fullscreenControl: true,
