@@ -13,7 +13,10 @@ const REVIER = {
     label: 'Obergrenze (ehem. Lindlmair-Infang)',
   },
   untergrenze: {
-    position: { lat: 48.13057441233753, lng: 14.225871043583517 },
+    // Zwei Punkte an den gegenueberliegenden Ufern fuer Linie ueber den Fluss
+    uferLinks:  { lat: 48.13042, lng: 14.22545 },
+    uferRechts: { lat: 48.13072, lng: 14.22630 },
+    center:     { lat: 48.13057, lng: 14.22588 },
     label: 'Untergrenze (50m ob. Obermuehlwehr)',
     flussKm: 17.070,
     regKm: 13.472,
@@ -82,14 +85,9 @@ export default function MapComponent({
       icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#EF4444', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 14 },
     });
 
-    // Untergrenze – rote Linie quer über den Fluss (analog zu OG)
-    const ugPos = REVIER.untergrenze.position;
-    const ugOffset = 0.00025; // ca. 25m Querversatz für Flusslinie
-    const ugPoint1 = { lat: ugPos.lat - ugOffset * 0.3, lng: ugPos.lng - ugOffset };
-    const ugPoint2 = { lat: ugPos.lat + ugOffset * 0.3, lng: ugPos.lng + ugOffset };
-
+    // Untergrenze – rote Linie von Ufer zu Ufer
     new google.maps.Polyline({
-      path: [ugPoint1, ugPoint2],
+      path: [REVIER.untergrenze.uferLinks, REVIER.untergrenze.uferRechts],
       strokeColor: '#EF4444',
       strokeOpacity: 0.9,
       strokeWeight: 4,
@@ -97,7 +95,7 @@ export default function MapComponent({
     });
 
     new google.maps.Marker({
-      position: ugPos, map: mapInstance,
+      position: REVIER.untergrenze.center, map: mapInstance,
       label: { text: 'UG', color: '#fff', fontWeight: 'bold', fontSize: '11px' },
       title: REVIER.untergrenze.label,
       icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#EF4444', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 14 },
@@ -122,6 +120,15 @@ export default function MapComponent({
       (err) => console.error('GPS-Fehler:', err),
       { enableHighAccuracy: true, timeout: 10000 }
     );
+  };
+
+  const handleZoomToRevier = () => {
+    if (!mapRef.current) return;
+    const bounds = new google.maps.LatLngBounds(
+      { lat: REVIER.bounds.south, lng: REVIER.bounds.west },
+      { lat: REVIER.bounds.north, lng: REVIER.bounds.east }
+    );
+    mapRef.current.fitBounds(bounds);
   };
 
   if (loadError) {
@@ -197,17 +204,32 @@ export default function MapComponent({
         ))}
       </GoogleMap>
 
-      {/* GPS-Button */}
-      <button
-        onClick={handleGPS}
-        className="absolute bottom-4 right-4 bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 active:bg-gray-100 transition-colors z-10"
-        title="Meinen Standort verwenden"
-      >
-        <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      </button>
+      {/* Button-Leiste rechts unten */}
+      <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-10">
+        {/* Zum Hauserwasser zoomen */}
+        <button
+          onClick={handleZoomToRevier}
+          className="bg-white px-3 py-2.5 rounded-full shadow-lg hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-1.5"
+          title="Zum Hauserwasser zoomen"
+        >
+          <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+          </svg>
+          <span className="text-xs font-semibold text-primary-700">Hauserwasser</span>
+        </button>
+
+        {/* GPS-Button */}
+        <button
+          onClick={handleGPS}
+          className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 active:bg-gray-100 transition-colors self-end"
+          title="Meinen Standort verwenden"
+        >
+          <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }
