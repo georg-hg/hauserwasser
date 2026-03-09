@@ -204,32 +204,27 @@ export default function MapComponent({
         ))}
       </GoogleMap>
 
-      {/* Button-Leiste rechts unten */}
-      <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-10">
-        {/* Zum Hauserwasser zoomen */}
-        <button
-          onClick={handleZoomToRevier}
-          className="bg-white px-3 py-2.5 rounded-full shadow-lg hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-1.5"
-          title="Zum Hauserwasser zoomen"
-        >
-          <svg className="w-4 h-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-          </svg>
-          <span className="text-xs font-semibold text-primary-700">Hauserwasser</span>
-        </button>
+      {/* Hauserwasser – prominent rechts oben */}
+      <button
+        onClick={handleZoomToRevier}
+        className="absolute top-3 right-3 z-10 bg-primary-700 hover:bg-primary-800 active:bg-primary-900 text-white px-4 py-2.5 rounded-lg shadow-xl transition-colors flex items-center gap-2"
+        title="Zum Hauserwasser zoomen"
+      >
+        <img src="/icons/icon-96x96.png" alt="" className="w-6 h-6 rounded-full" />
+        <span className="text-sm font-bold tracking-wide">Hauserwasser</span>
+      </button>
 
-        {/* GPS-Button */}
-        <button
-          onClick={handleGPS}
-          className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 active:bg-gray-100 transition-colors self-end"
-          title="Meinen Standort verwenden"
-        >
-          <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
-      </div>
+      {/* GPS-Button rechts unten */}
+      <button
+        onClick={handleGPS}
+        className="absolute bottom-4 right-4 z-10 bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+        title="Meinen Standort verwenden"
+      >
+        <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      </button>
     </div>
   );
 }

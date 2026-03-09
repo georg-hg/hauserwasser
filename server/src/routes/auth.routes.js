@@ -1,11 +1,51 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
 const { JWT_SECRET } = require('../middleware/auth');
 
 const router = express.Router();
+
+// ── E-Mail Transporter ─────────────────────────────────────
+const mailTransporter = process.env.GMAIL_APP_PASSWORD
+  ? nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: 'hauserwasser@gmail.com',
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    })
+  : null;
+
+async function sendRegistrationNotification({ firstName, lastName, email, fisherCardNr }) {
+  if (!mailTransporter) {
+    console.warn('Mail nicht konfiguriert – GMAIL_APP_PASSWORD fehlt.');
+    return;
+  }
+  try {
+    await mailTransporter.sendMail({
+      from: '"Hauserwasser Fangbuch" <hauserwasser@gmail.com>',
+      to: 'hauserwasser@gmail.com',
+      subject: `Neue Registrierung: ${firstName} ${lastName}`,
+      html: `
+        <h2>Neue Registrierung im Hauserwasser Fangbuch</h2>
+        <p>Es hat sich eine neue Person für das digitale Fangbuch registriert:</p>
+        <table style="border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:6px 12px;font-weight:bold;">Vorname:</td><td style="padding:6px 12px;">${firstName}</td></tr>
+          <tr><td style="padding:6px 12px;font-weight:bold;">Nachname:</td><td style="padding:6px 12px;">${lastName}</td></tr>
+          <tr><td style="padding:6px 12px;font-weight:bold;">E-Mail:</td><td style="padding:6px 12px;">${email}</td></tr>
+          <tr><td style="padding:6px 12px;font-weight:bold;">Fischerkarte Nr.:</td><td style="padding:6px 12px;">${fisherCardNr || '–'}</td></tr>
+        </table>
+        <p style="color:#666;font-size:13px;">Diese E-Mail wurde automatisch vom Hauserwasser Fangbuch versendet.</p>
+      `,
+    });
+    console.log('Registrierungs-Mail versendet für:', email);
+  } catch (err) {
+    console.error('Mail-Versand fehlgeschlagen:', err.message);
+  }
+}
 
 // ── POST /api/auth/register ────────────────────────────────
 router.post('/register', async (req, res) => {
@@ -40,6 +80,9 @@ router.post('/register', async (req, res) => {
       JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    // E-Mail-Benachrichtigung (async, blockiert Response nicht)
+    sendRegistrationNotification({ firstName, lastName, email, fisherCardNr });
 
     res.status(201).json({
       token,
