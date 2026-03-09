@@ -68,7 +68,12 @@ export default function MonitoringSection() {
     return `${val.toFixed(2)} ${unit}`;
   };
 
-  // Einfache SVG-Chart Komponente
+  // Wert → Y-Koordinate (Hilfsfunktion)
+  const valToY = (val, scaleMin, scaleRange, marginTop, chartHeight) => {
+    return marginTop + chartHeight - ((val - scaleMin) / scaleRange) * chartHeight;
+  };
+
+  // SVG-Chart Komponente
   const renderChart = () => {
     if (data.length === 0) return null;
 
@@ -85,68 +90,122 @@ export default function MonitoringSection() {
       );
     }
 
-    const minVal = Math.min(...values);
-    const maxVal = Math.max(...values);
-    const range = maxVal - minVal || 1;
-    const padding = range * 0.1;
+    const dataMin = Math.min(...values);
+    const dataMax = Math.max(...values);
+
+    // Bei CH2: Y-Achse immer mindestens bis 12 g/l damit Grenzwert-Zonen sichtbar sind
+    const scaleMin = 0;
+    const scaleMax = selectedChannel === 'ch2'
+      ? Math.max(dataMax * 1.1, 12000)
+      : dataMax * 1.15;
+    const scaleRange = scaleMax - scaleMin || 1;
 
     const width = 800;
-    const height = 250;
+    const height = 280;
     const marginLeft = 60;
     const marginBottom = 30;
     const marginTop = 20;
     const chartWidth = width - marginLeft - 10;
     const chartHeight = height - marginBottom - marginTop;
 
+    const toY = (val) => valToY(val, scaleMin, scaleRange, marginTop, chartHeight);
+    const chartRight = width - 10;
+
     const points = chartData
       .map((d, i) => {
         const val = d[channelKey];
         if (val === null) return null;
         const x = marginLeft + (i / (chartData.length - 1 || 1)) * chartWidth;
-        const y = marginTop + chartHeight - ((val - minVal + padding) / (range + 2 * padding)) * chartHeight;
-        return `${x},${y}`;
+        return `${x},${toY(val)}`;
       })
       .filter(Boolean);
-
-    // Grenzwert-Linien für CH2
-    const thresholdLines = [];
-    if (selectedChannel === 'ch2') {
-      const y5g = marginTop + chartHeight - ((5000 - minVal + padding) / (range + 2 * padding)) * chartHeight;
-      const y10g = marginTop + chartHeight - ((10000 - minVal + padding) / (range + 2 * padding)) * chartHeight;
-      if (y5g > marginTop && y5g < height - marginBottom) {
-        thresholdLines.push({ y: y5g, label: '5 g/l', color: '#f59e0b' });
-      }
-      if (y10g > marginTop && y10g < height - marginBottom) {
-        thresholdLines.push({ y: y10g, label: '10 g/l', color: '#ef4444' });
-      }
-    }
 
     // Y-Achsen-Labels
     const ySteps = 5;
     const yLabels = [];
     for (let i = 0; i <= ySteps; i++) {
-      const val = minVal - padding + (range + 2 * padding) * (i / ySteps);
-      const y = marginTop + chartHeight - (i / ySteps) * chartHeight;
+      const val = scaleMin + scaleRange * (i / ySteps);
       let label = val.toFixed(1);
-      if (selectedChannel === 'ch2' && val >= 1000) label = `${(val / 1000).toFixed(1)}g`;
-      yLabels.push({ y, label });
+      if (selectedChannel === 'ch2') {
+        if (val >= 1000) label = `${(val / 1000).toFixed(1)}g`;
+        else label = `${val.toFixed(0)}`;
+      }
+      yLabels.push({ y: toY(val), label });
     }
+
+    // Farbige Hintergrundzonen für CH2
+    const renderCh2Zones = () => {
+      if (selectedChannel !== 'ch2') return null;
+
+      const y0 = toY(0);
+      const y5g = toY(5000);
+      const y10g = toY(10000);
+      const yTop = marginTop;
+
+      // Clip auf Chartbereich
+      const clamp = (y) => Math.max(yTop, Math.min(y, y0));
+
+      return (
+        <g>
+          {/* Grün: 0 – 5 g/l (OK) */}
+          <rect
+            x={marginLeft} y={clamp(y5g)}
+            width={chartWidth} height={clamp(y0) - clamp(y5g)}
+            fill="#dcfce7" opacity="0.5"
+          />
+          {/* Gelb: 5 – 10 g/l (Grenzwert Bau überschritten) */}
+          <rect
+            x={marginLeft} y={clamp(y10g)}
+            width={chartWidth} height={clamp(y5g) - clamp(y10g)}
+            fill="#fef3c7" opacity="0.5"
+          />
+          {/* Rot: > 10 g/l (Max Tageshöchstwert überschritten) */}
+          {y10g > yTop && (
+            <rect
+              x={marginLeft} y={yTop}
+              width={chartWidth} height={clamp(y10g) - yTop}
+              fill="#fee2e2" opacity="0.5"
+            />
+          )}
+
+          {/* 5 g/l Grenzwert-Linie */}
+          <line x1={marginLeft} y1={y5g} x2={chartRight} y2={y5g}
+            stroke="#d97706" strokeWidth="2" strokeDasharray="8,4" />
+          <rect x={chartRight - 105} y={y5g - 18} width={103} height={16} rx="3" fill="#d97706" />
+          <text x={chartRight - 54} y={y5g - 7} textAnchor="middle" fill="white" fontSize="10" fontWeight="600">
+            Grenzwert 5 g/l
+          </text>
+
+          {/* 10 g/l Max-Linie */}
+          <line x1={marginLeft} y1={y10g} x2={chartRight} y2={y10g}
+            stroke="#dc2626" strokeWidth="2" strokeDasharray="8,4" />
+          <rect x={chartRight - 82} y={y10g - 18} width={80} height={16} rx="3" fill="#dc2626" />
+          <text x={chartRight - 42} y={y10g - 7} textAnchor="middle" fill="white" fontSize="10" fontWeight="600">
+            Max 10 g/l
+          </text>
+        </g>
+      );
+    };
 
     return (
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+        {/* Clip-Path für Chartbereich */}
+        <defs>
+          <clipPath id="chart-clip">
+            <rect x={marginLeft} y={marginTop} width={chartWidth} height={chartHeight} />
+          </clipPath>
+        </defs>
+
+        {/* Farbige Hintergrundzonen (CH2) */}
+        <g clipPath="url(#chart-clip)">
+          {renderCh2Zones()}
+        </g>
+
         {/* Grid */}
         {yLabels.map((yl, i) => (
           <g key={i}>
-            <line x1={marginLeft} y1={yl.y} x2={width - 10} y2={yl.y} stroke="#e5e7eb" strokeWidth="1" />
+            <line x1={marginLeft} y1={yl.y} x2={chartRight} y2={yl.y} stroke="#e5e7eb" strokeWidth="0.5" />
             <text x={marginLeft - 8} y={yl.y + 4} textAnchor="end" fill="#9ca3af" fontSize="11">{yl.label}</text>
-          </g>
-        ))}
-
-        {/* Grenzwert-Linien */}
-        {thresholdLines.map((tl, i) => (
-          <g key={`th-${i}`}>
-            <line x1={marginLeft} y1={tl.y} x2={width - 10} y2={tl.y} stroke={tl.color} strokeWidth="2" strokeDasharray="6,4" />
-            <text x={width - 12} y={tl.y - 5} textAnchor="end" fill={tl.color} fontSize="11" fontWeight="600">{tl.label}</text>
           </g>
         ))}
 
@@ -154,9 +213,11 @@ export default function MonitoringSection() {
         <polyline
           fill="none"
           stroke={info.color}
-          strokeWidth="2"
+          strokeWidth="2.5"
           strokeLinejoin="round"
+          strokeLinecap="round"
           points={points.join(' ')}
+          clipPath="url(#chart-clip)"
         />
 
         {/* Achsenbeschriftung */}
@@ -295,6 +356,24 @@ export default function MonitoringSection() {
           )}
         </div>
 
+        {/* Legende für CH2 Grenzwerte */}
+        {selectedChannel === 'ch2' && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs">
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-3 rounded-sm bg-green-100 border border-green-300" />
+              <span className="text-gray-600">&lt; 5 g/l – OK</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-3 rounded-sm bg-amber-100 border border-amber-300" />
+              <span className="text-gray-600">5 – 10 g/l – Grenzwert Bau überschritten</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-3 rounded-sm bg-red-100 border border-red-300" />
+              <span className="text-gray-600">&gt; 10 g/l – Max. Tageshöchstwert überschritten</span>
+            </div>
+          </div>
+        )}
+
         <p className="text-xs text-gray-400 mt-2">
           {CHANNEL_INFO[selectedChannel].description} · Messsonde &quot;Ende&quot;
         </p>
@@ -312,7 +391,7 @@ export default function MonitoringSection() {
                 <tr>
                   <th className="text-left px-4 py-2 font-medium text-gray-600">Zeitpunkt</th>
                   <th className="text-right px-4 py-2 font-medium text-gray-600">Trübe (NTU)</th>
-                  <th className="text-right px-4 py-2 font-medium text-gray-600">Schwebstoff</th>
+                  <th className="text-right px-4 py-2 font-medium text-gray-600">Schwebstoff (g/l)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -320,11 +399,17 @@ export default function MonitoringSection() {
                   <tr key={d.id} className="hover:bg-gray-50">
                     <td className="px-4 py-2 text-gray-600">{formatDate(d.measuredAt)}</td>
                     <td className="px-4 py-2 text-right font-mono">{d.ch1Ntu?.toFixed(2) ?? '—'}</td>
-                    <td className={`px-4 py-2 text-right font-mono ${
-                      d.ch2MgL > 10000 ? 'text-red-600 font-bold' :
-                      d.ch2MgL > 5000 ? 'text-amber-600 font-semibold' : ''
-                    }`}>
-                      {d.ch2MgL !== null ? formatValue(d.ch2MgL, 'mg/l') : '—'}
+                    <td className="px-4 py-2 text-right">
+                      {d.ch2MgL !== null ? (
+                        <span className={`inline-flex items-center gap-1 font-mono ${
+                          d.ch2MgL > 10000 ? 'text-red-600 font-bold' :
+                          d.ch2MgL > 5000 ? 'text-amber-600 font-semibold' : ''
+                        }`}>
+                          {d.ch2MgL > 10000 && <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />}
+                          {d.ch2MgL > 5000 && d.ch2MgL <= 10000 && <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />}
+                          {formatValue(d.ch2MgL, 'mg/l')}
+                        </span>
+                      ) : '—'}
                     </td>
                   </tr>
                 ))}
