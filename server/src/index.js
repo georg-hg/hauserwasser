@@ -53,11 +53,52 @@ app.use((err, req, res, next) => {
   });
 });
 
+// ── Auto-Migration beim Start ───────────────────────────────
+async function autoMigrate() {
+  try {
+    // Blocked-Felder auf users
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'users' AND column_name = 'blocked'
+        ) THEN
+          ALTER TABLE users ADD COLUMN blocked BOOLEAN DEFAULT false;
+          ALTER TABLE users ADD COLUMN blocked_at TIMESTAMPTZ;
+          ALTER TABLE users ADD COLUMN blocked_reason TEXT;
+        END IF;
+      END $$;
+    `);
+
+    // Admin-Notifications Tabelle
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS admin_notifications (
+        id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        type            VARCHAR(50) NOT NULL DEFAULT 'registration',
+        title           VARCHAR(255) NOT NULL,
+        message         TEXT,
+        related_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        read            BOOLEAN DEFAULT false,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_admin_notifications_read
+        ON admin_notifications(read, created_at DESC);
+    `);
+
+    console.log('✓ Auto-Migration erfolgreich.');
+  } catch (err) {
+    console.error('⚠ Auto-Migration Fehler (nicht kritisch):', err.message);
+  }
+}
+
 // ── Start ──────────────────────────────────────────────────
 async function start() {
   try {
     const { rows } = await pool.query('SELECT NOW()');
     console.log('✓ PostgreSQL verbunden:', rows[0].now);
+
+    await autoMigrate();
+
     app.listen(PORT, () => {
       console.log(`✓ Hauserwasser API läuft auf Port ${PORT}`);
     });
