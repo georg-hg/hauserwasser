@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../../api/client';
 
 const CHANNEL_INFO = {
@@ -21,6 +21,8 @@ export default function MonitoringSection() {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState(30);
   const [selectedChannel, setSelectedChannel] = useState('ch2');
+  const [hoveredIdx, setHoveredIdx] = useState(null);
+  const svgRef = useRef(null);
 
   useEffect(() => {
     loadData();
@@ -68,6 +70,18 @@ export default function MonitoringSection() {
     return `${val.toFixed(2)} ${unit}`;
   };
 
+  // Maus-Position → nächster Datenpunkt
+  const handleMouseMove = useCallback((e, chartData, marginLeft, chartWidth) => {
+    if (!svgRef.current || chartData.length === 0) return;
+    const svg = svgRef.current;
+    const rect = svg.getBoundingClientRect();
+    const mouseX = ((e.clientX - rect.left) / rect.width) * 800; // viewBox-Koordinaten
+    const relX = mouseX - marginLeft;
+    if (relX < 0 || relX > chartWidth) { setHoveredIdx(null); return; }
+    const idx = Math.round((relX / chartWidth) * (chartData.length - 1));
+    setHoveredIdx(Math.max(0, Math.min(idx, chartData.length - 1)));
+  }, []);
+
   // SVG-Chart Komponente
   const renderChart = () => {
     if (data.length === 0) return null;
@@ -85,22 +99,19 @@ export default function MonitoringSection() {
       );
     }
 
-    const dataMin = Math.min(...values);
     const dataMax = Math.max(...values);
 
-    // Y-Achse an die tatsächlichen Daten anpassen (mit etwas Padding)
+    // Y-Achse an die tatsächlichen Daten anpassen
     const scaleMin = 0;
     const dataCeiling = dataMax || 1;
     let scaleMax;
 
     if (selectedChannel === 'ch2') {
-      // Wenn Daten über 5g/l → bis über den höchsten Grenzwert skalieren
       if (dataMax > 10000) {
         scaleMax = dataMax * 1.15;
       } else if (dataMax > 5000) {
         scaleMax = Math.max(dataMax * 1.15, 11000);
       } else {
-        // Daten unter 5g/l → an Daten anpassen, Grenzwerte als Referenz oben anzeigen
         scaleMax = dataCeiling * 1.3;
       }
     } else {
@@ -110,22 +121,23 @@ export default function MonitoringSection() {
     const scaleRange = scaleMax - scaleMin || 1;
 
     const width = 800;
-    const height = 280;
+    const height = 310;
     const marginLeft = 60;
-    const marginBottom = 30;
+    const marginBottom = 55; // Mehr Platz für X-Achse
     const marginTop = 20;
     const chartWidth = width - marginLeft - 10;
     const chartHeight = height - marginBottom - marginTop;
 
     const toY = (val) => marginTop + chartHeight - ((val - scaleMin) / scaleRange) * chartHeight;
+    const toX = (i) => marginLeft + (i / (chartData.length - 1 || 1)) * chartWidth;
     const chartRight = width - 10;
+    const chartBottom = marginTop + chartHeight;
 
     const points = chartData
       .map((d, i) => {
         const val = d[channelKey];
         if (val === null) return null;
-        const x = marginLeft + (i / (chartData.length - 1 || 1)) * chartWidth;
-        return `${x},${toY(val)}`;
+        return `${toX(i)},${toY(val)}`;
       })
       .filter(Boolean);
 
@@ -144,37 +156,41 @@ export default function MonitoringSection() {
       yLabels.push({ y: toY(val), label });
     }
 
+    // X-Achsen-Labels (Datum)
+    const xLabelCount = Math.min(chartData.length, 6);
+    const xLabels = [];
+    for (let i = 0; i < xLabelCount; i++) {
+      const dataIdx = xLabelCount <= 1 ? 0 : Math.round(i * (chartData.length - 1) / (xLabelCount - 1));
+      const d = chartData[dataIdx];
+      if (!d?.measuredAt) continue;
+      const date = new Date(d.measuredAt);
+      const label = date.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit' });
+      const time = date.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
+      xLabels.push({ x: toX(dataIdx), label, time });
+    }
+
     // CH2 Grenzwert-Darstellung
     const renderCh2Thresholds = () => {
       if (selectedChannel !== 'ch2') return null;
 
-      const threshold5g = 5000; // mg/l
-      const threshold10g = 10000; // mg/l
-      const y5g = toY(threshold5g);
-      const y10g = toY(threshold10g);
+      const y5g = toY(5000);
+      const y10g = toY(10000);
+      const is5gVisible = y5g >= marginTop && y5g <= chartBottom;
+      const is10gVisible = y10g >= marginTop && y10g <= chartBottom;
 
-      // Prüfen ob Grenzwerte im sichtbaren Bereich liegen
-      const is5gVisible = y5g >= marginTop && y5g <= marginTop + chartHeight;
-      const is10gVisible = y10g >= marginTop && y10g <= marginTop + chartHeight;
-
-      // Wenn Daten über Grenzwerte → farbige Zonen + Linien
       if (is5gVisible || is10gVisible) {
         const yBottom = toY(0);
         const clamp = (y) => Math.max(marginTop, Math.min(y, yBottom));
 
         return (
           <g>
-            {/* Grün: 0 – 5 g/l */}
             <rect x={marginLeft} y={clamp(y5g)} width={chartWidth} height={clamp(yBottom) - clamp(y5g)} fill="#dcfce7" opacity="0.45" />
-            {/* Gelb: 5 – 10 g/l */}
             {is5gVisible && (
               <rect x={marginLeft} y={clamp(y10g)} width={chartWidth} height={clamp(y5g) - clamp(y10g)} fill="#fef3c7" opacity="0.45" />
             )}
-            {/* Rot: > 10 g/l */}
             {is10gVisible && (
               <rect x={marginLeft} y={marginTop} width={chartWidth} height={clamp(y10g) - marginTop} fill="#fee2e2" opacity="0.45" />
             )}
-            {/* 5 g/l Linie */}
             {is5gVisible && (
               <g>
                 <line x1={marginLeft} y1={y5g} x2={chartRight} y2={y5g} stroke="#d97706" strokeWidth="2" strokeDasharray="8,4" />
@@ -182,7 +198,6 @@ export default function MonitoringSection() {
                 <text x={chartRight - 55} y={y5g - 7} textAnchor="middle" fill="white" fontSize="10" fontWeight="600">Grenzwert 5 g/l</text>
               </g>
             )}
-            {/* 10 g/l Linie */}
             {is10gVisible && (
               <g>
                 <line x1={marginLeft} y1={y10g} x2={chartRight} y2={y10g} stroke="#dc2626" strokeWidth="2" strokeDasharray="8,4" />
@@ -194,13 +209,9 @@ export default function MonitoringSection() {
         );
       }
 
-      // Grenzwerte liegen oberhalb des sichtbaren Bereichs → Referenz-Badges oben anzeigen
       return (
         <g>
-          {/* Gesamter Chartbereich grün hinterlegen (alles unter 5 g/l) */}
           <rect x={marginLeft} y={marginTop} width={chartWidth} height={chartHeight} fill="#dcfce7" opacity="0.3" />
-
-          {/* Referenz-Badges am oberen Rand */}
           <g>
             <rect x={marginLeft + 4} y={marginTop + 4} width={148} height={20} rx="4" fill="#d97706" opacity="0.9" />
             <text x={marginLeft + 12} y={marginTop + 17} fill="white" fontSize="10" fontWeight="600">
@@ -217,13 +228,57 @@ export default function MonitoringSection() {
       );
     };
 
+    // Hover-Tooltip
+    const renderHover = () => {
+      if (hoveredIdx === null || !chartData[hoveredIdx]) return null;
+      const d = chartData[hoveredIdx];
+      const val = d[channelKey];
+      if (val === null) return null;
+
+      const hx = toX(hoveredIdx);
+      const hy = toY(val);
+      const date = new Date(d.measuredAt);
+      const dateStr = date.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const timeStr = date.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' });
+      const valStr = formatValue(val, info.unit);
+
+      // Tooltip-Position: links oder rechts vom Cursor
+      const tooltipW = 150;
+      const tooltipH = 44;
+      const tooltipX = hx + tooltipW + 15 > width ? hx - tooltipW - 10 : hx + 10;
+      const tooltipY = Math.max(marginTop, Math.min(hy - tooltipH / 2, chartBottom - tooltipH));
+
+      return (
+        <g>
+          {/* Vertikale Linie */}
+          <line x1={hx} y1={marginTop} x2={hx} y2={chartBottom} stroke="#6b7280" strokeWidth="1" strokeDasharray="3,3" opacity="0.6" />
+          {/* Punkt auf Datenlinie */}
+          <circle cx={hx} cy={hy} r="5" fill={info.color} stroke="white" strokeWidth="2" />
+          {/* Tooltip-Box */}
+          <rect x={tooltipX} y={tooltipY} width={tooltipW} height={tooltipH} rx="6" fill="white" stroke="#e5e7eb" strokeWidth="1" filter="url(#tooltip-shadow)" />
+          <text x={tooltipX + 10} y={tooltipY + 16} fill="#374151" fontSize="11" fontWeight="600">{valStr}</text>
+          <text x={tooltipX + 10} y={tooltipY + 32} fill="#9ca3af" fontSize="10">{dateStr}, {timeStr}</text>
+        </g>
+      );
+    };
+
     return (
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
-        {/* Clip-Path für Chartbereich */}
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full h-auto"
+        preserveAspectRatio="xMidYMid meet"
+        onMouseMove={(e) => handleMouseMove(e, chartData, marginLeft, chartWidth)}
+        onMouseLeave={() => setHoveredIdx(null)}
+        style={{ cursor: 'crosshair' }}
+      >
         <defs>
           <clipPath id="chart-clip">
             <rect x={marginLeft} y={marginTop} width={chartWidth} height={chartHeight} />
           </clipPath>
+          <filter id="tooltip-shadow" x="-10%" y="-10%" width="120%" height="130%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.12" />
+          </filter>
         </defs>
 
         {/* Hintergrund & Grenzwerte (CH2) */}
@@ -239,6 +294,15 @@ export default function MonitoringSection() {
           </g>
         ))}
 
+        {/* X-Achse: Datum-Labels */}
+        {xLabels.map((xl, i) => (
+          <g key={`x-${i}`}>
+            <line x1={xl.x} y1={chartBottom} x2={xl.x} y2={chartBottom + 5} stroke="#d1d5db" strokeWidth="1" />
+            <text x={xl.x} y={chartBottom + 17} textAnchor="middle" fill="#9ca3af" fontSize="10">{xl.label}</text>
+            <text x={xl.x} y={chartBottom + 29} textAnchor="middle" fill="#c4c8cf" fontSize="9">{xl.time}</text>
+          </g>
+        ))}
+
         {/* Daten-Linie */}
         <polyline
           fill="none"
@@ -248,6 +312,18 @@ export default function MonitoringSection() {
           strokeLinecap="round"
           points={points.join(' ')}
           clipPath="url(#chart-clip)"
+        />
+
+        {/* Hover-Interaktion */}
+        {renderHover()}
+
+        {/* Unsichtbare Hover-Fläche über dem Chart */}
+        <rect
+          x={marginLeft} y={marginTop}
+          width={chartWidth} height={chartHeight}
+          fill="transparent"
+          onMouseMove={(e) => handleMouseMove(e, chartData, marginLeft, chartWidth)}
+          onMouseLeave={() => setHoveredIdx(null)}
         />
 
         {/* Achsenbeschriftung */}
