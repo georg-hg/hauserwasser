@@ -167,7 +167,7 @@ router.post('/upload', auth, requireRole('admin'), upload.single('file'), async 
     let rows = [];
 
     if (ext === '.csv' || ext === '.txt') {
-      rows = await parseCSV(req.file.path);
+      rows = await parseTextFile(req.file.path);
     } else {
       rows = await parseExcel(req.file.path);
     }
@@ -208,19 +208,86 @@ router.post('/upload', auth, requireRole('admin'), upload.single('file'), async 
   }
 });
 
-// ── CSV-Parser ─────────────────────────────────────────────────
-async function parseCSV(filePath) {
+// ── Text/CSV-Parser ────────────────────────────────────────────
+// Unterstützt zwei Formate:
+// 1) Sonden-Format: T001:DD.MM.YYYY,HH:MM,Probe,CH01=xxx,CH02=yyy,CH32=zzz;
+// 2) CSV mit Header: Datum;CH1;CH2;CH32
+async function parseTextFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf-8');
   const lines = content.split(/\r?\n/).filter(l => l.trim());
 
+  if (lines.length === 0) return [];
+
+  // Format erkennen: Sonden-Format beginnt mit "T" + Ziffern + ":"
+  const firstLine = lines[0].trim();
+  if (/^T\d+:/.test(firstLine)) {
+    return parseProbeFormat(lines);
+  }
+
+  // Fallback: CSV mit Header
+  return parseCSV(lines);
+}
+
+// ── Sonden-Format Parser ───────────────────────────────────────
+// T001:08.03.2026,09:00,Ende,CH01=339.10,CH02=1.36;
+// T001:08.03.2026,11:00,Ende,CH01=306.86,CH02=1.23,CH32=8.29;
+function parseProbeFormat(lines) {
+  const rows = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim().replace(/;$/, ''); // Semikolon am Ende entfernen
+    if (!trimmed) continue;
+
+    // Prefix entfernen (T001:)
+    const withoutPrefix = trimmed.replace(/^T\d+:/, '');
+
+    // Komma-getrennt aufteilen: Datum, Uhrzeit, Probe, dann CH-Werte
+    const parts = withoutPrefix.split(',').map(p => p.trim());
+    if (parts.length < 3) continue;
+
+    const dateStr = parts[0]; // DD.MM.YYYY
+    const timeStr = parts[1]; // HH:MM
+    const probeName = parts[2]; // Ende
+
+    // Datum + Zeit parsen
+    const measuredAt = parseDate(`${dateStr} ${timeStr}`);
+    if (!measuredAt) continue;
+
+    // Kanal-Werte extrahieren (CH01=339.10, CH02=1.36, CH32=8.29)
+    let ch1 = null, ch2 = null, ch32 = null;
+
+    for (let i = 3; i < parts.length; i++) {
+      const kvMatch = parts[i].match(/^(CH\d+)\s*=\s*([\d.,-]+)$/i);
+      if (!kvMatch) continue;
+
+      const channel = kvMatch[1].toUpperCase();
+      const value = parseNum(kvMatch[2]);
+
+      if (channel === 'CH01' || channel === 'CH1') ch1 = value;
+      else if (channel === 'CH02' || channel === 'CH2') ch2 = value;
+      else if (channel === 'CH32') ch32 = value;
+    }
+
+    rows.push({
+      probe: probeName || 'Ende',
+      measuredAt,
+      ch1,
+      ch2,
+      ch32,
+    });
+  }
+
+  return rows;
+}
+
+// ── CSV mit Header Parser ──────────────────────────────────────
+function parseCSV(lines) {
   if (lines.length < 2) return [];
 
-  // Header erkennen
   const header = lines[0].toLowerCase();
   const separator = header.includes(';') ? ';' : ',';
   const headers = lines[0].split(separator).map(h => h.trim().toLowerCase());
 
-  // Spalten-Mapping: flexibel erkennen
   const dateIdx = headers.findIndex(h => h.includes('datum') || h.includes('date') || h.includes('zeit') || h.includes('time') || h.includes('timestamp'));
   const ch1Idx = headers.findIndex(h => h.includes('ch1') || h.includes('ntu') || h.includes('trübe') || h.includes('truebe'));
   const ch2Idx = headers.findIndex(h => h.includes('ch2') || h.includes('schweb') || h.includes('mg/l') || h.includes('mg_l'));
@@ -233,7 +300,6 @@ async function parseCSV(filePath) {
     const cols = lines[i].split(separator).map(c => c.trim());
     if (cols.length < 2) continue;
 
-    // Datum parsen
     let measuredAt = null;
     if (dateIdx >= 0 && cols[dateIdx]) {
       measuredAt = parseDate(cols[dateIdx]);
