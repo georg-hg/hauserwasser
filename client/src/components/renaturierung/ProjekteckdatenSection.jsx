@@ -135,7 +135,7 @@ export default function ProjekteckdatenSection() {
       {/* Messtechnik */}
       <div className="bg-white rounded-xl shadow-sm p-4">
         <h2 className="text-sm font-semibold text-gray-700 mb-3">Messtechnik</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
             <p className="text-xs font-semibold text-amber-800 mb-1">CH1 – Trübe</p>
             <p className="text-sm text-amber-700">NTU (Nephelometric Turbidity Units)</p>
@@ -145,11 +145,6 @@ export default function ProjekteckdatenSection() {
             <p className="text-xs font-semibold text-red-800 mb-1">CH2 – Schwebstofffracht</p>
             <p className="text-sm text-red-700">mg/l</p>
             <p className="text-xs text-red-600 mt-1">Grenzwert Bau: 5 g/l · Max Tag: 10 g/l</p>
-          </div>
-          <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-            <p className="text-xs font-semibold text-blue-800 mb-1">CH32 – Batterie</p>
-            <p className="text-sm text-blue-700">Volt</p>
-            <p className="text-xs text-blue-600 mt-1">Versorgungsspannung der Messsonde</p>
           </div>
         </div>
       </div>

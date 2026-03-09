@@ -4,7 +4,6 @@ import { api } from '../../api/client';
 const CHANNEL_INFO = {
   ch1: { label: 'Trübe (NTU)', color: '#f59e0b', unit: 'NTU', description: 'Trübungsmessung' },
   ch2: { label: 'Schwebstofffracht', color: '#ef4444', unit: 'mg/l', description: 'Grenzwert: 5 g/l (Bau), Max: 10 g/l (Tag)' },
-  ch32: { label: 'Batteriespannung', color: '#3b82f6', unit: 'V', description: 'Versorgungsspannung der Messsonde' },
 };
 
 const TIME_RANGES = [
@@ -74,7 +73,7 @@ export default function MonitoringSection() {
     if (data.length === 0) return null;
 
     const chartData = [...data].reverse(); // chronologisch
-    const channelKey = selectedChannel === 'ch1' ? 'ch1Ntu' : selectedChannel === 'ch2' ? 'ch2MgL' : 'ch32Voltage';
+    const channelKey = selectedChannel === 'ch1' ? 'ch1Ntu' : 'ch2MgL';
     const info = CHANNEL_INFO[selectedChannel];
     const values = chartData.map(d => d[channelKey]).filter(v => v !== null);
 
@@ -177,7 +176,7 @@ export default function MonitoringSection() {
   return (
     <div className="space-y-6">
       {/* Aktuelle Werte */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* CH1 - Trübe */}
         <div className="bg-white rounded-xl shadow-sm p-4 border-l-4 border-amber-400">
           <div className="flex items-center justify-between mb-1">
@@ -209,22 +208,6 @@ export default function MonitoringSection() {
           </p>
           <p className="text-xs text-gray-400 mt-1">
             Grenzwert: 5 g/l (Bau) · Max: 10 g/l
-          </p>
-        </div>
-
-        {/* CH32 - Batterie */}
-        <div className={`bg-white rounded-xl shadow-sm p-4 border-l-4 ${
-          latest?.ch32Voltage < 11 ? 'border-red-400' : 'border-blue-400'
-        }`}>
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">CH32 – Batterie</p>
-            <span className="text-xs text-gray-400">Volt</span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">
-            {latest?.ch32Voltage !== null ? `${latest?.ch32Voltage?.toFixed(2)} V` : '—'}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            Messsonde &quot;Ende&quot;
           </p>
         </div>
       </div>
@@ -330,7 +313,6 @@ export default function MonitoringSection() {
                   <th className="text-left px-4 py-2 font-medium text-gray-600">Zeitpunkt</th>
                   <th className="text-right px-4 py-2 font-medium text-gray-600">Trübe (NTU)</th>
                   <th className="text-right px-4 py-2 font-medium text-gray-600">Schwebstoff</th>
-                  <th className="text-right px-4 py-2 font-medium text-gray-600">Batterie (V)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -343,9 +325,6 @@ export default function MonitoringSection() {
                       d.ch2MgL > 5000 ? 'text-amber-600 font-semibold' : ''
                     }`}>
                       {d.ch2MgL !== null ? formatValue(d.ch2MgL, 'mg/l') : '—'}
-                    </td>
-                    <td className={`px-4 py-2 text-right font-mono ${d.ch32Voltage < 11 ? 'text-red-500' : ''}`}>
-                      {d.ch32Voltage?.toFixed(2) ?? '—'}
                     </td>
                   </tr>
                 ))}
@@ -364,7 +343,7 @@ export default function MonitoringSection() {
           <div className="text-xs text-gray-500">
             <p className="font-medium text-gray-600 mb-1">Datenquelle</p>
             <p>Messsonde &quot;Ende&quot; – Aktualisierung täglich um 08:00 Uhr</p>
-            <p className="mt-1">CH1: Trübe (NTU) · CH2: Schwebstofffracht (mg/l) · CH32: Batteriespannung (V)</p>
+            <p className="mt-1">CH1: Trübe (NTU) · CH2: Schwebstofffracht (mg/l)</p>
           </div>
         </div>
       </div>
