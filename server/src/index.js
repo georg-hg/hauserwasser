@@ -108,6 +108,23 @@ async function autoMigrate() {
         ON monitoring_data(measured_at DESC);
     `);
 
+    // Import-Tracking Tabelle
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS monitoring_imports (
+        id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        filename          VARCHAR(255) NOT NULL,
+        probe_name        VARCHAR(100) DEFAULT 'Ende',
+        records_total     INTEGER DEFAULT 0,
+        records_imported  INTEGER DEFAULT 0,
+        data_from         TIMESTAMPTZ,
+        data_to           TIMESTAMPTZ,
+        uploaded_by       UUID REFERENCES users(id) ON DELETE SET NULL,
+        uploaded_at       TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_monitoring_imports_date
+        ON monitoring_imports(uploaded_at DESC);
+    `);
+
     console.log('✓ Auto-Migration erfolgreich.');
   } catch (err) {
     console.error('⚠ Auto-Migration Fehler (nicht kritisch):', err.message);

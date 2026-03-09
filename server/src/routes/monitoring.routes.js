@@ -155,6 +155,46 @@ router.get('/stats', auth, async (req, res) => {
   }
 });
 
+// ── GET /api/monitoring/imports ────────────────────────────────
+// Liste aller importierten Dateien (absteigend nach Datum)
+router.get('/imports', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT i.*, u.first_name, u.last_name
+      FROM monitoring_imports i
+      LEFT JOIN users u ON u.id = i.uploaded_by
+      ORDER BY i.uploaded_at DESC
+      LIMIT 100
+    `);
+
+    res.json(rows.map(r => ({
+      id: r.id,
+      filename: r.filename,
+      probeName: r.probe_name,
+      recordsTotal: r.records_total,
+      recordsImported: r.records_imported,
+      dataFrom: r.data_from,
+      dataTo: r.data_to,
+      uploadedAt: r.uploaded_at,
+      uploadedBy: r.first_name ? `${r.first_name} ${r.last_name}` : null,
+    })));
+  } catch (err) {
+    console.error('Imports list error:', err);
+    res.status(500).json({ error: 'Fehler beim Laden der Importe.' });
+  }
+});
+
+// ── GET /api/monitoring/nas-info ──────────────────────────────
+// NAS-Datenserver Info
+router.get('/nas-info', auth, async (req, res) => {
+  res.json({
+    url: 'https://tbzauner.com:5001/sharing/rHzpr3WXH',
+    name: 'Datenserver TB Zauner',
+    folder: 'KremsKematen',
+    description: 'Messdaten der Sonden für die Renaturierung Krems',
+  });
+});
+
 // ── POST /api/monitoring/upload ───────────────────────────────
 // CSV/Excel-Upload für Messdaten (nur Admin)
 router.post('/upload', auth, requireRole('admin'), upload.single('file'), async (req, res) => {
@@ -176,6 +216,11 @@ router.post('/upload', auth, requireRole('admin'), upload.single('file'), async 
       return res.status(400).json({ error: 'Keine Daten in der Datei gefunden.' });
     }
 
+    // Zeitraum der Daten ermitteln
+    const timestamps = rows.map(r => new Date(r.measuredAt).getTime()).filter(t => !isNaN(t));
+    const dataFrom = timestamps.length ? new Date(Math.min(...timestamps)) : null;
+    const dataTo = timestamps.length ? new Date(Math.max(...timestamps)) : null;
+
     // Batch-Insert
     let inserted = 0;
     for (const row of rows) {
@@ -192,6 +237,15 @@ router.post('/upload', auth, requireRole('admin'), upload.single('file'), async 
       }
     }
 
+    // Import-Eintrag speichern
+    const probeName = rows[0]?.probe || 'Ende';
+    await pool.query(`
+      INSERT INTO monitoring_imports (filename, probe_name, records_total, records_imported, data_from, data_to, uploaded_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `, [req.file.originalname, probeName, rows.length, inserted, dataFrom, dataTo, req.user.id]).catch(err => {
+      console.error('Import tracking error:', err.message);
+    });
+
     // Temp-Datei löschen
     fs.unlink(req.file.path, () => {});
 
@@ -199,6 +253,9 @@ router.post('/upload', auth, requireRole('admin'), upload.single('file'), async 
       message: `${inserted} von ${rows.length} Messwerten importiert.`,
       inserted,
       total: rows.length,
+      filename: req.file.originalname,
+      dataFrom,
+      dataTo,
     });
   } catch (err) {
     console.error('Upload error:', err);

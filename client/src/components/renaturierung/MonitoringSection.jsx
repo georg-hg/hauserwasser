@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../../api/client';
-import { useAuth } from '../../hooks/useAuth';
 
 const CHANNEL_INFO = {
   ch1: { label: 'Trübe (NTU)', color: '#f59e0b', unit: 'NTU', description: 'Trübungsmessung' },
@@ -17,16 +16,12 @@ const TIME_RANGES = [
 ];
 
 export default function MonitoringSection() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
   const [data, setData] = useState([]);
   const [latest, setLatest] = useState(null);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState(30);
   const [selectedChannel, setSelectedChannel] = useState('ch2');
-  const [uploadStatus, setUploadStatus] = useState(null);
-  const fileInputRef = useRef(null);
 
   useEffect(() => {
     loadData();
@@ -56,27 +51,6 @@ export default function MonitoringSection() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadStatus({ type: 'loading', message: 'Importiere Daten...' });
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const result = await api.upload('/api/monitoring/upload', formData);
-      setUploadStatus({ type: 'success', message: result.message });
-      loadData();
-    } catch (err) {
-      setUploadStatus({ type: 'error', message: err.message });
-    }
-
-    // Reset file input
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    setTimeout(() => setUploadStatus(null), 5000);
   };
 
   const formatDate = (dateStr) => {
@@ -333,7 +307,7 @@ export default function MonitoringSection() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
               </svg>
               <p className="text-sm">Noch keine Messdaten vorhanden</p>
-              {isAdmin && <p className="text-xs mt-1">Lade Daten über den CSV-Import hoch</p>}
+              <p className="text-xs mt-1">Importiere Daten über den Datenserver-Tab</p>
             </div>
           )}
         </div>
@@ -377,49 +351,6 @@ export default function MonitoringSection() {
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-      )}
-
-      {/* Admin: CSV-Upload */}
-      {isAdmin && (
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-              <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700">Messdaten importieren</h3>
-              <p className="text-xs text-gray-500">CSV, TXT oder Excel-Datei mit Messwerten hochladen</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.xlsx,.xls,.txt"
-              onChange={handleUpload}
-              className="text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 file:cursor-pointer"
-            />
-          </div>
-
-          {uploadStatus && (
-            <div className={`mt-3 text-sm px-3 py-2 rounded-lg ${
-              uploadStatus.type === 'success' ? 'bg-green-50 text-green-700' :
-              uploadStatus.type === 'error' ? 'bg-red-50 text-red-700' :
-              'bg-blue-50 text-blue-700'
-            }`}>
-              {uploadStatus.message}
-            </div>
-          )}
-
-          <div className="mt-3 text-xs text-gray-400">
-            <p className="font-medium mb-1">Erwartetes Format:</p>
-            <p>Spalten: Datum/Zeitstempel, CH1 (NTU), CH2 (mg/l), CH32 (Volt)</p>
-            <p>Trennzeichen: Komma oder Semikolon · Dezimal: Punkt oder Komma</p>
           </div>
         </div>
       )}
