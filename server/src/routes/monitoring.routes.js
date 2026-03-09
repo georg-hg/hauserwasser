@@ -14,10 +14,10 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (['.csv', '.xlsx', '.xls'].includes(ext)) {
+    if (['.csv', '.xlsx', '.xls', '.txt'].includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Nur CSV/Excel-Dateien erlaubt.'));
+      cb(new Error('Nur CSV/Excel/TXT-Dateien erlaubt.'));
     }
   },
 });
@@ -166,7 +166,7 @@ router.post('/upload', auth, requireRole('admin'), upload.single('file'), async 
     const ext = path.extname(req.file.originalname).toLowerCase();
     let rows = [];
 
-    if (ext === '.csv') {
+    if (ext === '.csv' || ext === '.txt') {
       rows = await parseCSV(req.file.path);
     } else {
       rows = await parseExcel(req.file.path);

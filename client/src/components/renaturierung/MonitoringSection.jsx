@@ -392,7 +392,7 @@ export default function MonitoringSection() {
             </div>
             <div>
               <h3 className="text-sm font-semibold text-gray-700">Messdaten importieren</h3>
-              <p className="text-xs text-gray-500">CSV oder Excel-Datei mit Messwerten hochladen</p>
+              <p className="text-xs text-gray-500">CSV, TXT oder Excel-Datei mit Messwerten hochladen</p>
             </div>
           </div>
 
@@ -400,7 +400,7 @@ export default function MonitoringSection() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,.xlsx,.xls"
+              accept=".csv,.xlsx,.xls,.txt"
               onChange={handleUpload}
               className="text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 file:cursor-pointer"
             />
