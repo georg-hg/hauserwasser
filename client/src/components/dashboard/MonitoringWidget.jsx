@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 
 const API_URL = import.meta.env.VITE_API_URL
   ? `https://${import.meta.env.VITE_API_URL}`
@@ -260,15 +261,26 @@ export default function MonitoringWidget() {
           <PrecipForecast precipitation={precipitation} />
         </div>
 
-        {/* Footer */}
-        <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-          <p className="text-[10px] text-gray-300">
+        {/* Footer mit Link zu Renaturierung Monitoring */}
+        <Link
+          to="/renaturierung?tab=monitoring"
+          className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between group hover:bg-emerald-50 transition-colors block"
+        >
+          <p className="text-[10px] text-gray-400 group-hover:text-emerald-600 transition-colors">
             Sonde &laquo;{data.probe}&raquo; &middot; Renaturierung Krems
           </p>
-          {latest?.measuredAt && (
-            <span className="text-[10px] text-gray-400">{formatAge(latest.measuredAt)}</span>
-          )}
-        </div>
+          <div className="flex items-center gap-1.5">
+            {latest?.measuredAt && (
+              <span className="text-[10px] text-gray-400">{formatAge(latest.measuredAt)}</span>
+            )}
+            <span className="text-[10px] text-emerald-500 font-medium flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              Details
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </span>
+          </div>
+        </Link>
       </div>
     </div>
   );

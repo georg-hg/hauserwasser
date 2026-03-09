@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useSearchParams } from 'react-router-dom';
 import DatenserverSection from './DatenserverSection';
 import MonitoringSection from './MonitoringSection';
 import ProjekteckdatenSection from './ProjekteckdatenSection';
@@ -15,10 +16,22 @@ const ALL_TABS = [
 export default function Renaturierung() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const [searchParams] = useSearchParams();
 
   const tabs = ALL_TABS.filter(tab => !tab.adminOnly || isAdmin);
   const defaultTab = isAdmin ? 'datenserver' : 'monitoring';
-  const [activeTab, setActiveTab] = useState(defaultTab);
+
+  // Tab aus URL-Parameter lesen (z.B. /renaturierung?tab=monitoring)
+  const urlTab = searchParams.get('tab');
+  const initialTab = urlTab && tabs.some(t => t.id === urlTab) ? urlTab : defaultTab;
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Bei URL-Änderung Tab wechseln
+  useEffect(() => {
+    if (urlTab && tabs.some(t => t.id === urlTab)) {
+      setActiveTab(urlTab);
+    }
+  }, [urlTab]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
