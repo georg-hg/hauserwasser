@@ -16,6 +16,7 @@ router.get('/fishers', async (req, res) => {
     const { rows } = await pool.query(`
       SELECT u.id, u.email, u.first_name, u.last_name, u.role,
              u.fisher_card_nr, u.birth_date, u.created_at,
+             u.blocked, u.blocked_at, u.blocked_reason,
              l.id AS license_id, l.season_year, l.activated_at, l.revoked_at,
              (SELECT COUNT(*) FROM catches c WHERE c.user_id = u.id
               AND EXTRACT(YEAR FROM c.catch_date) = $1) AS catch_count
@@ -34,6 +35,9 @@ router.get('/fishers', async (req, res) => {
       fisherCardNr: r.fisher_card_nr,
       birthDate: r.birth_date,
       createdAt: r.created_at,
+      blocked: r.blocked || false,
+      blockedAt: r.blocked_at,
+      blockedReason: r.blocked_reason,
       catchCount: parseInt(r.catch_count),
       license: r.license_id ? {
         id: r.license_id,
@@ -276,6 +280,113 @@ router.get('/export/catches', async (req, res) => {
   } catch (err) {
     console.error('Export error:', err);
     res.status(500).json({ error: 'Export fehlgeschlagen.' });
+  }
+});
+
+// ── GET /api/admin/notifications ─────────────────────────────
+// Admin-Inbox: alle Benachrichtigungen
+router.get('/notifications', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT n.*, u.first_name, u.last_name, u.email, u.fisher_card_nr, u.blocked
+      FROM admin_notifications n
+      LEFT JOIN users u ON u.id = n.related_user_id
+      ORDER BY n.created_at DESC
+      LIMIT 100
+    `);
+    res.json(rows.map(r => ({
+      id: r.id,
+      type: r.type,
+      title: r.title,
+      message: r.message,
+      read: r.read,
+      createdAt: r.created_at,
+      relatedUser: r.related_user_id ? {
+        id: r.related_user_id,
+        firstName: r.first_name,
+        lastName: r.last_name,
+        email: r.email,
+        fisherCardNr: r.fisher_card_nr,
+        blocked: r.blocked,
+      } : null,
+    })));
+  } catch (err) {
+    console.error('Notifications error:', err);
+    res.status(500).json({ error: 'Fehler beim Laden der Benachrichtigungen.' });
+  }
+});
+
+// ── GET /api/admin/notifications/unread-count ────────────────
+// Anzahl ungelesener Notifications (für Badge)
+router.get('/notifications/unread-count', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT COUNT(*) AS count FROM admin_notifications WHERE read = false'
+    );
+    res.json({ count: parseInt(rows[0].count) });
+  } catch (err) {
+    console.error('Unread count error:', err);
+    res.status(500).json({ error: 'Fehler.' });
+  }
+});
+
+// ── PUT /api/admin/notifications/:id/read ────────────────────
+// Einzelne Notification als gelesen markieren
+router.put('/notifications/:id/read', async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE admin_notifications SET read = true WHERE id = $1',
+      [req.params.id]
+    );
+    res.json({ message: 'Gelesen.' });
+  } catch (err) {
+    console.error('Mark read error:', err);
+    res.status(500).json({ error: 'Fehler.' });
+  }
+});
+
+// ── PUT /api/admin/notifications/read-all ────────────────────
+// Alle Notifications als gelesen markieren
+router.put('/notifications/read-all', async (req, res) => {
+  try {
+    await pool.query('UPDATE admin_notifications SET read = true WHERE read = false');
+    res.json({ message: 'Alle gelesen.' });
+  } catch (err) {
+    console.error('Mark all read error:', err);
+    res.status(500).json({ error: 'Fehler.' });
+  }
+});
+
+// ── PUT /api/admin/fishers/:id/block ─────────────────────────
+// User sperren
+router.put('/fishers/:id/block', async (req, res) => {
+  try {
+    const { reason } = req.body;
+    await pool.query(
+      `UPDATE users SET blocked = true, blocked_at = NOW(), blocked_reason = $2
+       WHERE id = $1`,
+      [req.params.id, reason || null]
+    );
+    res.json({ message: 'Fischer gesperrt.' });
+  } catch (err) {
+    console.error('Block error:', err);
+    res.status(500).json({ error: 'Fehler beim Sperren.' });
+  }
+});
+
+// ── PUT /api/admin/fishers/:id/unblock ───────────────────────
+// User entsperren
+router.put('/fishers/:id/unblock', async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE users SET blocked = false, blocked_at = NULL, blocked_reason = NULL
+       WHERE id = $1`,
+      [req.params.id]
+    );
+    res.json({ message: 'Fischer entsperrt.' });
+  } catch (err) {
+    console.error('Unblock error:', err);
+    res.status(500).json({ error: 'Fehler beim Entsperren.' });
   }
 });
 

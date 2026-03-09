@@ -1,5 +1,7 @@
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { api } from '../../api/client';
 
 const FISHER_ITEMS = [
   { path: '/', label: 'Dashboard' },
@@ -19,6 +21,21 @@ export default function Navbar() {
   const location = useLocation();
   const isAdmin = user?.role === 'admin';
   const navItems = isAdmin ? [...FISHER_ITEMS, ...ADMIN_ITEMS] : FISHER_ITEMS;
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const loadUnread = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const data = await api.get('/api/admin/notifications/unread-count');
+      setUnreadCount(data.count);
+    } catch {}
+  }, [isAdmin]);
+
+  useEffect(() => {
+    loadUnread();
+    const interval = setInterval(loadUnread, 30000);
+    return () => clearInterval(interval);
+  }, [loadUnread]);
 
   return (
     <nav className="bg-primary-700 text-white shadow-lg sticky top-0 z-50">
@@ -36,7 +53,7 @@ export default function Navbar() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`relative px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   location.pathname === item.path
                     ? 'bg-white/20 text-white'
                     : item.path === '/admin'
@@ -45,6 +62,11 @@ export default function Navbar() {
                 }`}
               >
                 {item.label}
+                {item.path === '/admin' && unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-red-500 text-white">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </Link>
             ))}
           </div>

@@ -84,6 +84,17 @@ router.post('/register', async (req, res) => {
     // E-Mail-Benachrichtigung (async, blockiert Response nicht)
     sendRegistrationNotification({ firstName, lastName, email, fisherCardNr });
 
+    // Admin-Notification in DB speichern
+    pool.query(
+      `INSERT INTO admin_notifications (type, title, message, related_user_id)
+       VALUES ('registration', $1, $2, $3)`,
+      [
+        `Neue Registrierung: ${firstName} ${lastName}`,
+        `${firstName} ${lastName} (${email}) hat sich registriert. Fischerkarte: ${fisherCardNr || '–'}`,
+        user.id,
+      ]
+    ).catch(err => console.error('Notification insert error:', err.message));
+
     res.status(201).json({
       token,
       user: {
@@ -119,6 +130,11 @@ router.post('/login', async (req, res) => {
     }
 
     const user = rows[0];
+
+    if (user.blocked) {
+      return res.status(403).json({ error: 'Dein Zugang wurde gesperrt. Bitte kontaktiere den Fischereiverband.' });
+    }
+
     const validPassword = await bcrypt.compare(password, user.password_hash);
 
     if (!validPassword) {

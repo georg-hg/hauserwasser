@@ -95,6 +95,32 @@ const SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS idx_licenses_user_year
     ON licenses(user_id, season_year);
+
+  -- Blocked-Flag auf users (User sperren)
+  DO $$ BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'users' AND column_name = 'blocked'
+    ) THEN
+      ALTER TABLE users ADD COLUMN blocked BOOLEAN DEFAULT false;
+      ALTER TABLE users ADD COLUMN blocked_at TIMESTAMPTZ;
+      ALTER TABLE users ADD COLUMN blocked_reason TEXT;
+    END IF;
+  END $$;
+
+  -- Admin-Benachrichtigungen (Inbox)
+  CREATE TABLE IF NOT EXISTS admin_notifications (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    type            VARCHAR(50) NOT NULL DEFAULT 'registration',
+    title           VARCHAR(255) NOT NULL,
+    message         TEXT,
+    related_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    read            BOOLEAN DEFAULT false,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_admin_notifications_read
+    ON admin_notifications(read, created_at DESC);
 `;
 
 async function migrate() {
