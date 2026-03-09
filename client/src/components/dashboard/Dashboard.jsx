@@ -6,6 +6,7 @@ import QuotaTracker from './QuotaTracker';
 import StatsCard from './StatsCard';
 import WaterWidget from './WaterWidget';
 import WeatherWidget from './WeatherWidget';
+import MonitoringWidget from './MonitoringWidget';
 import SeasonalFish from './SeasonalFish';
 
 export default function Dashboard() {
@@ -50,6 +51,9 @@ export default function Dashboard() {
 
       {/* Gewässerdaten Krems (Pegelstand, Durchfluss, Temperatur) */}
       <WaterWidget />
+
+      {/* Sedimentmonitoring Krems (Trübe + Schwebstoff + Trend) */}
+      <MonitoringWidget />
 
       {/* Karte mit allen Faengen */}
       <div className="card p-0 overflow-hidden">

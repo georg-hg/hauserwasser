@@ -110,6 +110,137 @@ router.get('/latest', auth, async (req, res) => {
   }
 });
 
+// ── GET /api/monitoring/dashboard ─────────────────────────────
+// Dashboard-Widget: 4 Tage Messdaten + Niederschlagsprognose + Trend
+router.get('/dashboard', auth, async (req, res) => {
+  try {
+    const probeName = req.query.probe || 'Ende';
+
+    // Letzte 4 Tage Messdaten (aggregiert pro Stunde → Durchschnitt)
+    const { rows: measurements } = await pool.query(`
+      SELECT
+        date_trunc('hour', measured_at) AS hour,
+        AVG(ch1_ntu) AS avg_ch1,
+        AVG(ch2_mg_l) AS avg_ch2
+      FROM monitoring_data
+      WHERE probe_name = $1
+        AND measured_at >= NOW() - INTERVAL '4 days'
+      GROUP BY date_trunc('hour', measured_at)
+      ORDER BY hour ASC
+    `, [probeName]);
+
+    // Letzter Messwert
+    const { rows: latestRows } = await pool.query(`
+      SELECT measured_at, ch1_ntu, ch2_mg_l
+      FROM monitoring_data
+      WHERE probe_name = $1
+      ORDER BY measured_at DESC
+      LIMIT 1
+    `, [probeName]);
+
+    const latest = latestRows[0] || null;
+
+    // Niederschlagsprognose für Kirchdorf & Kremsmünster (Open-Meteo)
+    let precipitation = null;
+    try {
+      const locations = [
+        { name: 'Kirchdorf', lat: 47.9064, lon: 14.1231 },
+        { name: 'Kremsmuenster', lat: 48.0525, lon: 14.1294 },
+      ];
+
+      const precipResults = await Promise.all(locations.map(async (loc) => {
+        const params = new URLSearchParams({
+          latitude: loc.lat,
+          longitude: loc.lon,
+          daily: 'precipitation_sum,precipitation_probability_max',
+          timezone: 'Europe/Vienna',
+          forecast_days: 3,
+        });
+        const resp = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        return {
+          name: loc.name,
+          forecast: data.daily.time.map((date, i) => ({
+            date,
+            precipSum: data.daily.precipitation_sum[i],
+            precipProbability: data.daily.precipitation_probability_max[i],
+          })),
+        };
+      }));
+
+      precipitation = precipResults.filter(Boolean);
+    } catch (precipErr) {
+      console.error('Precipitation forecast error:', precipErr.message);
+    }
+
+    // Trend berechnen: Vergleich letzte 24h vs. vorherige 24h + Niederschlag
+    let ch1Trend = 'stable';
+    let ch2Trend = 'stable';
+
+    if (measurements.length >= 4) {
+      const mid = Math.floor(measurements.length / 2);
+      const firstHalf = measurements.slice(0, mid);
+      const secondHalf = measurements.slice(mid);
+
+      const avgFirst = (arr, key) => arr.reduce((s, r) => s + (parseFloat(r[key]) || 0), 0) / arr.length;
+      const avgSecond = (arr, key) => arr.reduce((s, r) => s + (parseFloat(r[key]) || 0), 0) / arr.length;
+
+      const ch1First = avgFirst(firstHalf, 'avg_ch1');
+      const ch1Second = avgSecond(secondHalf, 'avg_ch1');
+      const ch2First = avgFirst(firstHalf, 'avg_ch2');
+      const ch2Second = avgSecond(secondHalf, 'avg_ch2');
+
+      // Trend aus Messwerten
+      const ch1Change = ch1First > 0 ? (ch1Second - ch1First) / ch1First : 0;
+      const ch2Change = ch2First > 0 ? (ch2Second - ch2First) / ch2First : 0;
+
+      // Niederschlag-Boost: starker Regen in Prognose → Trend eher steigend
+      let precipBoost = 0;
+      if (precipitation && precipitation.length > 0) {
+        const totalPrecip = precipitation.reduce((sum, loc) => {
+          return sum + loc.forecast.reduce((s, d) => s + (d.precipSum || 0), 0);
+        }, 0);
+        // Wenn >10mm Gesamtregen erwartet → deutlicher Boost
+        if (totalPrecip > 20) precipBoost = 0.15;
+        else if (totalPrecip > 10) precipBoost = 0.08;
+        else if (totalPrecip > 5) precipBoost = 0.03;
+      }
+
+      const ch1Score = ch1Change + precipBoost;
+      const ch2Score = ch2Change + precipBoost;
+
+      if (ch1Score > 0.05) ch1Trend = 'rising';
+      else if (ch1Score < -0.05) ch1Trend = 'falling';
+
+      if (ch2Score > 0.05) ch2Trend = 'rising';
+      else if (ch2Score < -0.05) ch2Trend = 'falling';
+    }
+
+    res.json({
+      probe: probeName,
+      latest: latest ? {
+        measuredAt: latest.measured_at,
+        ch1Ntu: latest.ch1_ntu ? parseFloat(latest.ch1_ntu) : null,
+        ch2MgL: latest.ch2_mg_l ? parseFloat(latest.ch2_mg_l) : null,
+      } : null,
+      sparkline: measurements.map(r => ({
+        hour: r.hour,
+        ch1: r.avg_ch1 ? parseFloat(parseFloat(r.avg_ch1).toFixed(2)) : null,
+        ch2: r.avg_ch2 ? parseFloat(parseFloat(r.avg_ch2).toFixed(2)) : null,
+      })),
+      trend: { ch1: ch1Trend, ch2: ch2Trend },
+      precipitation,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('Monitoring dashboard error:', err);
+    res.status(500).json({ error: 'Fehler beim Laden der Dashboard-Daten.' });
+  }
+});
+
 // ── GET /api/monitoring/stats ─────────────────────────────────
 // Statistik/Zusammenfassung (Grenzwertüberschreitungen etc.)
 router.get('/stats', auth, async (req, res) => {
