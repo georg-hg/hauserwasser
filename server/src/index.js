@@ -48,6 +48,7 @@ app.use('/api/admin', require('./routes/admin.routes'));
 app.use('/api/water', require('./routes/water.routes'));
 app.use('/api/weather', require('./routes/weather.routes'));
 app.use('/api/monitoring', require('./routes/monitoring.routes'));
+app.use('/api/predators', require('./routes/predators.routes'));
 
 // ── Error handler ──────────────────────────────────────────
 app.use((err, req, res, next) => {
@@ -123,6 +124,27 @@ async function autoMigrate() {
       );
       CREATE INDEX IF NOT EXISTS idx_monitoring_imports_date
         ON monitoring_imports(uploaded_at DESC);
+    `);
+
+    // Prädatoren-Sichtungen Tabelle
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS predator_sightings (
+        id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        sighted_at        TIMESTAMPTZ NOT NULL,
+        latitude          DECIMAL(10, 7) NOT NULL,
+        longitude         DECIMAL(10, 7) NOT NULL,
+        predator_type     VARCHAR(100) NOT NULL,
+        individual_count  INTEGER DEFAULT 1,
+        behavior          VARCHAR(100),
+        notes             TEXT,
+        photo_url         TEXT,
+        created_at        TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_predator_sightings_user_date
+        ON predator_sightings(user_id, sighted_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_predator_sightings_date
+        ON predator_sightings(sighted_at DESC);
     `);
 
     console.log('✓ Auto-Migration erfolgreich.');
