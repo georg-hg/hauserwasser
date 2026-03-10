@@ -44,12 +44,18 @@ const FISH_INDICATORS = [
  * Fisch erkennen – nutzt Google Cloud Vision API (LABEL_DETECTION + WEB_DETECTION)
  */
 async function identifyFish(imagePath) {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  // Bevorzuge eigenen Vision-Key, falle auf Maps-Key zurück
+  const apiKey = process.env.GOOGLE_VISION_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
 
   if (!apiKey) {
-    console.warn('[Fish-ID] No GOOGLE_MAPS_API_KEY configured');
-    return fallbackResult('API-Schlüssel nicht konfiguriert.');
+    console.warn('[Fish-ID] Kein API-Key konfiguriert (GOOGLE_VISION_API_KEY oder GOOGLE_MAPS_API_KEY)');
+    return fallbackResult(
+      'API-Schlüssel nicht konfiguriert. Bitte GOOGLE_VISION_API_KEY als Umgebungsvariable setzen.'
+    );
   }
+
+  const keySource = process.env.GOOGLE_VISION_API_KEY ? 'GOOGLE_VISION_API_KEY' : 'GOOGLE_MAPS_API_KEY';
+  console.log(`[Fish-ID] Verwende ${keySource} für Cloud Vision API`);
 
   try {
     // Bild vorbereiten (auf max 1024px skalieren, als Base64)
@@ -82,14 +88,38 @@ async function identifyFish(imagePath) {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
-      console.warn('[Fish-ID] Google Vision API Status:', response.status, errorText.substring(0, 300));
+      console.error('[Fish-ID] Google Vision API Error – Status:', response.status);
+      console.error('[Fish-ID] Response:', errorText.substring(0, 500));
 
-      // Check for specific error: API not enabled
-      if (response.status === 403 && errorText.includes('Cloud Vision API has not been used')) {
-        return fallbackResult('Google Vision API muss in der Cloud Console aktiviert werden.');
+      // Spezifische Fehler erkennen
+      if (response.status === 403) {
+        if (errorText.includes('Cloud Vision API has not been used') || errorText.includes('is not enabled')) {
+          console.error('[Fish-ID] → Cloud Vision API ist nicht aktiviert!');
+          console.error('[Fish-ID] → Bitte unter https://console.cloud.google.com/apis/library/vision.googleapis.com aktivieren');
+          return fallbackResult(
+            'Die Cloud Vision API ist nicht aktiviert. Bitte in der Google Cloud Console unter "APIs & Dienste" die "Cloud Vision API" aktivieren.'
+          );
+        }
+        if (errorText.includes('API key not valid') || errorText.includes('API_KEY_INVALID')) {
+          return fallbackResult('Der API-Schlüssel ist ungültig oder hat keine Berechtigung für die Vision API.');
+        }
+        if (errorText.includes('PERMISSION_DENIED') || errorText.includes('API key is not authorized')) {
+          return fallbackResult(
+            'Der API-Schlüssel hat keine Berechtigung für die Cloud Vision API. Bitte die API-Key-Einschränkungen in der Google Cloud Console prüfen.'
+          );
+        }
+        return fallbackResult('Zugriff auf die Bildanalyse verweigert (403). Bitte API-Key-Berechtigungen prüfen.');
       }
 
-      return fallbackResult('Bildanalyse-Service nicht verfügbar.');
+      if (response.status === 429) {
+        return fallbackResult('Zu viele Anfragen – bitte in einer Minute erneut versuchen.');
+      }
+
+      if (response.status === 400) {
+        return fallbackResult('Bildanalyse fehlgeschlagen – ungültiges Bild oder Anfrage.');
+      }
+
+      return fallbackResult(`Bildanalyse-Service nicht verfügbar (HTTP ${response.status}).`);
     }
 
     const data = await response.json();
@@ -211,6 +241,12 @@ async function identifyFish(imagePath) {
     };
   } catch (err) {
     console.error('[Fish-ID] Error:', err.message);
+    if (err.name === 'TimeoutError' || err.message?.includes('timeout')) {
+      return fallbackResult('Zeitüberschreitung bei der Bildanalyse – bitte erneut versuchen.');
+    }
+    if (err.message?.includes('ENOTFOUND') || err.message?.includes('network')) {
+      return fallbackResult('Netzwerkfehler – Verbindung zum Bildanalyse-Service nicht möglich.');
+    }
     return fallbackResult('Fehler bei der Bildanalyse: ' + err.message);
   }
 }
