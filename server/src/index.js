@@ -49,6 +49,7 @@ app.use('/api/water', require('./routes/water.routes'));
 app.use('/api/weather', require('./routes/weather.routes'));
 app.use('/api/monitoring', require('./routes/monitoring.routes'));
 app.use('/api/predators', require('./routes/predators.routes'));
+app.use('/api/revier', require('./routes/revier.routes'));
 
 // ── Error handler ──────────────────────────────────────────
 app.use((err, req, res, next) => {

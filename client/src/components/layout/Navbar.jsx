@@ -13,6 +13,7 @@ const FISHER_ITEMS = [
 ];
 
 const ADMIN_ITEMS = [
+  { path: '/revier', label: 'Revier' },
   { path: '/admin', label: 'Admin' },
 ];
 
