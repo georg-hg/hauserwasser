@@ -28,11 +28,11 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: GOOGLE_MAPS_API_KEY
-        value: AIzaSyCkV_EsHvBIrKGjBPYMrKr1ej7DHoHDIKg
+        sync: false  # Manuell auf Render setzen – nicht im Repo speichern!
       - key: GOOGLE_VISION_API_KEY
-        value: AIzaSyD92m-spIs7D6KmzTST4DaJhF9KByuUn-0
+        sync: false
       - key: GEMINI_API_KEY
-        value: AIzaSyBty-AJoxn_-ds-37BhzLg0UK3lhTsTTQ8
+        sync: false
       - key: CORS_ORIGIN
         value: https://hauserwasser-client.onrender.com
 
@@ -57,4 +57,4 @@ services:
       - key: VITE_API_URL
         value: hauserwasser-api.onrender.com
       - key: VITE_GOOGLE_MAPS_KEY
-        value: AIzaSyCkV_EsHvBIrKGjBPYMrKr1ej7DHoHDIKg
+        sync: false  # Manuell auf Render setzen
