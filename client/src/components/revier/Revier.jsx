@@ -135,6 +135,122 @@ function BesatzSection() {
   );
 }
 
+function ManualAnalysisForm({ onSave, onCancel, saving }) {
+  const [form, setForm] = useState({
+    name: 'Krems (OÖ)',
+    region: 'Oberösterreich',
+    fischregion: 'Hyporhithral',
+    charakteristik: '',
+    fischarten: 'Bachforelle;Salmo trutta fario;natürlich;hoch;Leitfischart\nRegenbogenforelle;Oncorhynchus mykiss;Besatz;mittel;Besatzfisch\nÄsche;Thymallus thymallus;natürlich;mittel;Bestandsaufbau\nBachsaibling;Salvelinus fontinalis;Besatz;niedrig;Zurückhaltend besetzen',
+    empfehlungen: '',
+    prognose: '',
+  });
+
+  const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
+
+  return (
+    <div className="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border-b border-blue-100">
+        <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+          <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+          </svg>
+          Manuelle Revier-Analyse
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">Daten direkt eingeben statt KI-Analyse</p>
+      </div>
+
+      <div className="p-5 space-y-4">
+        {/* Gewässer-Info */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Gewässer</label>
+            <input
+              type="text" value={form.name} onChange={e => set('name', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Region</label>
+            <input
+              type="text" value={form.region} onChange={e => set('region', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Fischregion</label>
+            <input
+              type="text" value={form.fischregion} onChange={e => set('fischregion', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Charakteristik</label>
+          <textarea
+            value={form.charakteristik} onChange={e => set('charakteristik', e.target.value)}
+            rows={2} placeholder="Beschreibung des Gewässerabschnitts..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+          />
+        </div>
+
+        {/* Fischarten */}
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Fischarten <span className="text-gray-400 font-normal">(eine pro Zeile: Name;Wiss. Name;Vorkommen;Besatz;Hinweis)</span>
+          </label>
+          <textarea
+            value={form.fischarten} onChange={e => set('fischarten', e.target.value)}
+            rows={6} placeholder="Bachforelle;Salmo trutta fario;natürlich;hoch;Leitfischart"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+          />
+          <p className="text-xs text-gray-400 mt-1">Vorkommen: natürlich/Besatz/selten — Besatz: hoch/mittel/niedrig/nein</p>
+        </div>
+
+        {/* Empfehlungen */}
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Strategische Empfehlungen <span className="text-gray-400 font-normal">(eine pro Zeile)</span>
+          </label>
+          <textarea
+            value={form.empfehlungen} onChange={e => set('empfehlungen', e.target.value)}
+            rows={3} placeholder="Regelmäßiger Besatz mit standortgerechten Bachforellen..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+          />
+        </div>
+
+        {/* Prognose */}
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Ökologische Zustandsprognose</label>
+          <textarea
+            value={form.prognose} onChange={e => set('prognose', e.target.value)}
+            rows={2} placeholder="Einschätzung des ökologischen Zustands..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+          />
+        </div>
+
+        {/* Buttons */}
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={() => onSave(form)}
+            disabled={saving || !form.fischarten.trim()}
+            className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Speichere...' : 'Analyse speichern'}
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+          >
+            Abbrechen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Revier() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
@@ -142,6 +258,8 @@ export default function Revier() {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('besatz');
+  const [showManual, setShowManual] = useState(false);
+  const [manualSaving, setManualSaving] = useState(false);
 
   async function loadAnalysis(forceRefresh = false) {
     try {
@@ -160,8 +278,51 @@ export default function Revier() {
     }
   }
 
-  // Analyse wird erst beim Wechsel auf den Analyse-Tab geladen
-  // (nicht beim initialen Laden, da Besatz der Standard-Tab ist)
+  async function saveManualAnalysis(formData) {
+    try {
+      setManualSaving(true);
+      // Fischarten aus Textarea parsen (eine pro Zeile: Name, Wiss. Name, Vorkommen, Besatz, Hinweis)
+      const fischarten = formData.fischarten
+        .split('\n')
+        .filter(l => l.trim())
+        .map(line => {
+          const [name, wissenschaftlicher_name, vorkommen, besatz_empfehlung, management_hinweis] =
+            line.split(';').map(s => s.trim());
+          return {
+            name: name || '',
+            wissenschaftlicher_name: wissenschaftlicher_name || '',
+            vorkommen: vorkommen || 'natürlich',
+            besatz_empfehlung: besatz_empfehlung || 'mittel',
+            management_hinweis: management_hinweis || '',
+          };
+        });
+
+      const empfehlungen = formData.empfehlungen
+        .split('\n')
+        .filter(l => l.trim());
+
+      const analysis = {
+        gewaesser_info: {
+          name: formData.name || 'Krems (OÖ)',
+          region: formData.region || 'Oberösterreich',
+          fischregion_typ: formData.fischregion || 'Hyporhithral',
+          charakteristik: formData.charakteristik || '',
+        },
+        fischarten_inventar: fischarten,
+        strategische_empfehlungen: empfehlungen,
+        oekologischer_zustand_prognose: formData.prognose || '',
+      };
+
+      const result = await api.post('/api/revier/analyse', { analysis });
+      setData(result);
+      setError(null);
+      setShowManual(false);
+    } catch (err) {
+      setError('Speichern fehlgeschlagen: ' + err.message);
+    } finally {
+      setManualSaving(false);
+    }
+  }
 
   // Analyse nur laden wenn Tab gewechselt wird
   useEffect(() => {
@@ -229,20 +390,36 @@ export default function Revier() {
         </div>
       )}
 
-      {activeTab === 'analyse' && error && (
+      {activeTab === 'analyse' && error && !showManual && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
           <svg className="w-10 h-10 text-red-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
           </svg>
           <p className="text-red-700 font-medium mb-2">Analyse fehlgeschlagen</p>
           <p className="text-red-600 text-sm mb-4">{error}</p>
-          <button
-            onClick={() => loadAnalysis(true)}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
-          >
-            Erneut versuchen
-          </button>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => loadAnalysis(true)}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
+            >
+              Erneut versuchen
+            </button>
+            <button
+              onClick={() => setShowManual(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+            >
+              Manuell eingeben
+            </button>
+          </div>
         </div>
+      )}
+
+      {activeTab === 'analyse' && showManual && (
+        <ManualAnalysisForm
+          onSave={saveManualAnalysis}
+          onCancel={() => setShowManual(false)}
+          saving={manualSaving}
+        />
       )}
 
       {activeTab === 'analyse' && data && (() => {

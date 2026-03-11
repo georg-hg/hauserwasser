@@ -102,6 +102,25 @@ Antworte ausschliesslich mit einem JSON-Objekt in dieser Struktur:
   }
 });
 
+// ── Manuelle Analyse speichern ──
+router.post('/analyse', async (req, res) => {
+  try {
+    const { analysis } = req.body;
+    if (!analysis || !analysis.gewaesser_info || !analysis.fischarten_inventar) {
+      return res.status(400).json({ error: 'Ungueltiges Analyse-Format.' });
+    }
+
+    cachedAnalysis = { analysis, analyzedAt: new Date().toISOString(), manual: true };
+    cacheTimestamp = Date.now();
+
+    console.log('[Revier] Manuelle Analyse gespeichert, Arten:', analysis.fischarten_inventar.length);
+    res.json({ ...cachedAnalysis, cached: false });
+  } catch (err) {
+    console.error('[Revier] Manual save error:', err.message);
+    res.status(500).json({ error: 'Speichern fehlgeschlagen: ' + err.message });
+  }
+});
+
 // ── Static Map Proxy (nutzt serverseitigen GOOGLE_MAPS_API_KEY) ──
 router.get('/static-map', async (req, res) => {
   try {
