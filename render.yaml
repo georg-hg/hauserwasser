@@ -29,6 +29,8 @@ services:
         generateValue: true
       - key: GOOGLE_MAPS_API_KEY
         value: AIzaSyCkV_EsHvBIrKGjBPYMrKr1ej7DHoHDIKg
+      - key: GOOGLE_VISION_API_KEY
+        value: AIzaSyD92m-spIs7D6KmzTST4DaJhF9KByuUn-0
       - key: CORS_ORIGIN
         value: https://hauserwasser-client.onrender.com
 
