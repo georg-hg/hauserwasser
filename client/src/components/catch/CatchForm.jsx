@@ -71,6 +71,18 @@ export default function CatchForm() {
     }
   };
 
+  const handleDeletePhoto = () => {
+    setPreview(null);
+    setAnalysisResult(null);
+    setAnalysisApplied(false);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const handleReanalyze = () => {
+    setAnalysisResult(null);
+    setAnalysisApplied(false);
+  };
+
   const handleAnalyze = async () => {
     const file = fileRef.current?.files?.[0];
     if (!file) return;
@@ -156,13 +168,26 @@ export default function CatchForm() {
         {/* Foto & Fisch-Analyse */}
         <div className="card space-y-3">
           <label className="block text-sm font-medium text-gray-700">Foto aufnehmen</label>
-          <div
-            onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-primary-400 hover:bg-primary-50/50 transition-colors"
-          >
-            {preview ? (
+          {preview ? (
+            <div className="relative">
               <img src={preview} alt="Vorschau" className="max-h-48 mx-auto rounded-lg object-contain" />
-            ) : (
+              {/* Foto loeschen Button */}
+              <button
+                type="button"
+                onClick={handleDeletePhoto}
+                className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-lg transition-colors"
+                title="Foto entfernen"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <div
+              onClick={() => fileRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-primary-400 hover:bg-primary-50/50 transition-colors"
+            >
               <div className="space-y-1">
                 <svg className="w-10 h-10 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -171,8 +196,8 @@ export default function CatchForm() {
                 <p className="text-sm text-gray-500">Foto aufnehmen oder hochladen</p>
                 <p className="text-xs text-gray-400">Art, Laenge & Herkunft werden automatisch erkannt</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
           <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="hidden" />
 
           {/* Analyse-Button */}
@@ -293,6 +318,33 @@ export default function CatchForm() {
             <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
               <p className="text-sm text-yellow-700 font-medium">Art nicht erkannt</p>
               <p className="text-xs text-yellow-600 mt-0.5">{analysisResult.note} Bitte unten manuell auswaehlen.</p>
+            </div>
+          )}
+
+          {/* Aktionen nach Analyse: Erneut analysieren / Neues Foto */}
+          {analysisResult && !analyzing && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleReanalyze}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-sm font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+                </svg>
+                Erneut analysieren
+              </button>
+              <button
+                type="button"
+                onClick={() => { handleDeletePhoto(); setTimeout(() => fileRef.current?.click(), 100); }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                </svg>
+                Neues Foto
+              </button>
             </div>
           )}
         </div>
