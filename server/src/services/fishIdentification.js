@@ -169,13 +169,13 @@ async function identifyFish(imagePath) {
     }
     speciesMatches.sort((a, b) => b.score - a.score);
 
-    // ── Schritt 2: Längenschätzung via Gemini Vision ──
-    let estimatedLength = null;
+    // ── Schritt 2: Detailanalyse via Gemini Vision (Länge + Herkunft) ──
+    let geminiAnalysis = null;
     try {
-      estimatedLength = await estimateFishLength(base64Image, speciesMatches[0]?.german);
-      console.log('[Fish-ID] Geschätzte Länge:', estimatedLength);
+      geminiAnalysis = await analyzeWithGemini(base64Image, speciesMatches[0]?.german);
+      console.log('[Fish-ID] Gemini-Analyse:', geminiAnalysis);
     } catch (err) {
-      console.warn('[Fish-ID] Längenschätzung fehlgeschlagen:', err.message);
+      console.warn('[Fish-ID] Gemini-Analyse fehlgeschlagen:', err.message);
     }
 
     if (speciesMatches.length > 0) {
@@ -187,7 +187,8 @@ async function identifyFish(imagePath) {
         speciesGerman: top.german,
         speciesLatin: top.latin,
         confidence: Math.round(top.score * 100) / 100,
-        estimatedLength,
+        estimatedLength: geminiAnalysis?.estimatedLength || null,
+        origin: geminiAnalysis?.origin || null,
         allResults: speciesMatches.slice(0, 5).map(m => ({
           name: m.latin,
           commonName: m.german,
@@ -203,7 +204,8 @@ async function identifyFish(imagePath) {
       speciesGerman: 'Nicht erkannt',
       speciesLatin: '',
       confidence: 0,
-      estimatedLength,
+      estimatedLength: geminiAnalysis?.estimatedLength || null,
+      origin: geminiAnalysis?.origin || null,
       allResults: [],
       note: 'Fisch erkannt, aber Art konnte nicht zugeordnet werden. Bitte manuell auswählen.',
     };
@@ -220,37 +222,56 @@ async function identifyFish(imagePath) {
 }
 
 /**
- * Fischlänge schätzen via Google Gemini Vision API
- * Analysiert das Bild und schätzt die Länge anhand visueller Hinweise
- * (Hände, Untergrund, Proportionen, Netz, etc.)
+ * Detailanalyse via Google Gemini Vision API:
+ * - Geschätzte Länge (anhand Hände, Kescher, Umgebung)
+ * - Herkunft: Wildfisch vs. Besatzfisch (anhand Fettflosse, Färbung, Flossen, Körperform)
  */
-async function estimateFishLength(base64Image, speciesName) {
+async function analyzeWithGemini(base64Image, speciesName) {
   const geminiKey = process.env.GEMINI_API_KEY
     || process.env.GOOGLE_VISION_API_KEY
     || process.env.GOOGLE_MAPS_API_KEY;
 
   if (!geminiKey) {
-    console.warn('[Fish-Length] Kein API-Key für Gemini');
+    console.warn('[Fish-Gemini] Kein API-Key für Gemini');
     return null;
   }
 
-  const prompt = `Du bist ein Experte für Süßwasserfische in Oberösterreich. Analysiere dieses Foto eines Fisches und schätze die Gesamtlänge (Kopf bis Schwanzflosse) in Zentimetern.
+  const prompt = `Du bist ein erfahrener Fischereibiologe und Experte für Süßwasserfische in Oberösterreich (Flussgebiet Krems/Steyr). Analysiere dieses Foto eines Fisches.
 
 ${speciesName ? `Die Art wurde als "${speciesName}" identifiziert.` : ''}
 
-Nutze folgende Hinweise im Bild zur Größenschätzung:
+Analysiere ZWEI Dinge:
+
+**1. LÄNGENSCHÄTZUNG:**
+Schätze die Gesamtlänge (Kopf bis Schwanzflosse) in Zentimetern.
+Nutze folgende Hinweise:
 - Hände/Finger des Anglers (Handbreite ≈ 8-10 cm, Fingerbreite ≈ 2 cm)
 - Kescher/Netz (typische Öffnung 40-50 cm)
 - Untergrund-Textur (Gras, Steine, Holz)
 - Proportionen des Fischkörpers relativ zur Umgebung
-- Angelrute oder andere Ausrüstung im Bild
+
+**2. HERKUNFT (Wildfisch vs. Besatzfisch):**
+Bestimme ob es sich um einen Wildfisch (natürlich aufgewachsen) oder Besatzfisch (eingesetzt/Zuchtfisch) handelt.
+Prüfe dafür diese Merkmale:
+- **Fettflosse** (Adipose): Vorhanden = eher Wildfisch, fehlend/kupiert = Besatzfisch (bei Salmoniden)
+- **Flossenform**: Scharfe, intakte Flossen = Wildfisch; abgerundete, abgenutzte Flossen = Besatzfisch
+- **Färbung**: Kräftige, kontrastreiche Färbung mit vielen Punkten = Wildfisch; blasse, gleichmäßige Färbung = Besatzfisch
+- **Körperform**: Schlanker, stromlinienförmiger Körper = Wildfisch; gedrungener, schwerer Körper = Besatzfisch
+- **Punktmuster**: Vielfältiges, individuelles Muster = Wildfisch; gleichmäßiges/spärliches Muster = Besatzfisch
+- **Maulform**: Natürliche Proportionen = Wildfisch; Deformierungen (Unterbiss) = Besatzfisch
 
 WICHTIG: Antworte NUR mit einem JSON-Objekt in diesem Format, kein anderer Text:
-{"lengthCm": <Zahl>, "confidence": "<niedrig|mittel|hoch>", "hint": "<kurze Begründung auf Deutsch>"}
+{
+  "lengthCm": <Zahl oder null>,
+  "lengthConfidence": "<niedrig|mittel|hoch>",
+  "lengthHint": "<kurze Begründung>",
+  "origin": "<wildfisch|besatzfisch|unklar>",
+  "originConfidence": "<niedrig|mittel|hoch>",
+  "originHint": "<kurze Begründung mit erkannten Merkmalen auf Deutsch>"
+}
 
-Beispiel: {"lengthCm": 35, "confidence": "mittel", "hint": "Geschätzt anhand der Handgröße des Anglers"}
-
-Falls du die Länge nicht einschätzen kannst, antworte: {"lengthCm": null, "confidence": "niedrig", "hint": "Keine Referenzobjekte im Bild erkennbar"}`;
+Beispiel Wildfisch: {"lengthCm": 38, "lengthConfidence": "mittel", "lengthHint": "Geschätzt anhand der Handgröße", "origin": "wildfisch", "originConfidence": "hoch", "originHint": "Fettflosse vorhanden, kräftige Tupfenmuster, schlanke Körperform"}
+Beispiel Besatzfisch: {"lengthCm": 30, "lengthConfidence": "mittel", "lengthHint": "Geschätzt anhand des Keschers", "origin": "besatzfisch", "originConfidence": "mittel", "originHint": "Fettflosse fehlt, blasse Färbung, abgerundete Flossen"}`;
 
   try {
     const response = await fetch(
@@ -272,56 +293,69 @@ Falls du die Länge nicht einschätzen kannst, antworte: {"lengthCm": null, "con
           }],
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 200,
+            maxOutputTokens: 400,
           },
         }),
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(25000),
       }
     );
 
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
-      console.warn('[Fish-Length] Gemini API Error:', response.status, errText.substring(0, 200));
+      console.warn('[Fish-Gemini] Gemini API Error:', response.status, errText.substring(0, 200));
       return null;
     }
 
     const geminiData = await response.json();
     const textContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    console.log('[Fish-Length] Gemini raw response:', textContent);
+    console.log('[Fish-Gemini] Raw response:', textContent);
 
     // JSON aus Antwort extrahieren
     const jsonMatch = textContent.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
-      console.warn('[Fish-Length] Kein JSON in Gemini-Antwort gefunden');
+      console.warn('[Fish-Gemini] Kein JSON in Gemini-Antwort gefunden');
       return null;
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
 
-    if (parsed.lengthCm === null || parsed.lengthCm === undefined) {
-      return {
+    // Längenschätzung aufbereiten
+    let estimatedLength = null;
+    if (parsed.lengthCm !== null && parsed.lengthCm !== undefined) {
+      const lengthCm = Math.round(Number(parsed.lengthCm));
+      if (!isNaN(lengthCm) && lengthCm >= 3 && lengthCm <= 200) {
+        estimatedLength = {
+          lengthCm,
+          confidence: parsed.lengthConfidence || 'mittel',
+          hint: parsed.lengthHint || 'KI-Schätzung',
+          source: 'ai',
+        };
+      }
+    }
+    if (!estimatedLength && parsed.lengthHint) {
+      estimatedLength = {
         lengthCm: null,
         confidence: 'niedrig',
-        hint: parsed.hint || 'Länge konnte nicht geschätzt werden.',
+        hint: parsed.lengthHint,
         source: 'ai',
       };
     }
 
-    const lengthCm = Math.round(Number(parsed.lengthCm));
-    if (isNaN(lengthCm) || lengthCm < 3 || lengthCm > 200) {
-      console.warn('[Fish-Length] Unplausible Länge:', parsed.lengthCm);
-      return null;
+    // Herkunft aufbereiten
+    let origin = null;
+    const validOrigins = ['wildfisch', 'besatzfisch', 'unklar'];
+    if (parsed.origin && validOrigins.includes(parsed.origin)) {
+      origin = {
+        type: parsed.origin,
+        confidence: parsed.originConfidence || 'mittel',
+        hint: parsed.originHint || '',
+      };
     }
 
-    return {
-      lengthCm,
-      confidence: parsed.confidence || 'mittel',
-      hint: parsed.hint || 'KI-Schätzung',
-      source: 'ai',
-    };
+    return { estimatedLength, origin };
   } catch (err) {
-    console.warn('[Fish-Length] Fehler:', err.message);
+    console.warn('[Fish-Gemini] Fehler:', err.message);
     return null;
   }
 }
@@ -336,6 +370,7 @@ function fallbackResult(reason) {
     speciesLatin: '',
     confidence: 0,
     estimatedLength: null,
+    origin: null,
     allResults: [],
     note: reason || 'Automatische Erkennung nicht verfügbar – bitte Fischart manuell auswählen.',
   };

@@ -51,6 +51,9 @@ export default function ImageUpload() {
     if (result?.estimatedLength?.lengthCm) {
       params.set('length', result.estimatedLength.lengthCm);
     }
+    if (result?.origin?.type && result.origin.type !== 'unklar') {
+      params.set('origin', result.origin.type);
+    }
     navigate(`/fang/neu?${params.toString()}`);
   };
 
@@ -122,6 +125,53 @@ export default function ImageUpload() {
                 {result.speciesLatin} &middot; Konfidenz: {Math.round(result.confidence * 100)}%
               </p>
             </div>
+
+            {/* Herkunft: Wildfisch / Besatzfisch */}
+            {result.origin && result.origin.type !== 'unklar' && (
+              <div className={`rounded-lg p-4 border ${
+                result.origin.type === 'wildfisch'
+                  ? 'bg-emerald-50 border-emerald-200'
+                  : 'bg-orange-50 border-orange-200'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">
+                      {result.origin.type === 'wildfisch' ? '🐟' : '🏭'}
+                    </span>
+                    <span className={`text-lg font-bold ${
+                      result.origin.type === 'wildfisch' ? 'text-emerald-800' : 'text-orange-800'
+                    }`}>
+                      {result.origin.type === 'wildfisch' ? 'Wildfisch' : 'Besatzfisch'}
+                    </span>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    result.origin.confidence === 'hoch'
+                      ? 'bg-green-100 text-green-700'
+                      : result.origin.confidence === 'mittel'
+                        ? 'bg-yellow-100 text-yellow-700'
+                        : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {confidenceLabels[result.origin.confidence] || 'Schätzung'}
+                  </span>
+                </div>
+                {result.origin.hint && (
+                  <p className={`text-xs mt-2 ${
+                    result.origin.type === 'wildfisch' ? 'text-emerald-600' : 'text-orange-600'
+                  }`}>
+                    {result.origin.hint}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Herkunft unklar */}
+            {result.origin && result.origin.type === 'unklar' && result.origin.hint && (
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <p className="text-xs text-gray-500">
+                  <span className="font-medium">Herkunft:</span> {result.origin.hint}
+                </p>
+              </div>
+            )}
 
             {/* Geschätzte Länge */}
             {result.estimatedLength && result.estimatedLength.lengthCm && (
