@@ -330,6 +330,18 @@ router.get('/notifications/unread-count', async (req, res) => {
   }
 });
 
+// ── PUT /api/admin/notifications/read-all ────────────────────
+// Alle Notifications als gelesen markieren (MUSS vor :id stehen!)
+router.put('/notifications/read-all', async (req, res) => {
+  try {
+    await pool.query('UPDATE admin_notifications SET read = true WHERE read = false');
+    res.json({ message: 'Alle gelesen.' });
+  } catch (err) {
+    console.error('Mark all read error:', err);
+    res.status(500).json({ error: 'Fehler.' });
+  }
+});
+
 // ── PUT /api/admin/notifications/:id/read ────────────────────
 // Einzelne Notification als gelesen markieren
 router.put('/notifications/:id/read', async (req, res) => {
@@ -341,18 +353,6 @@ router.put('/notifications/:id/read', async (req, res) => {
     res.json({ message: 'Gelesen.' });
   } catch (err) {
     console.error('Mark read error:', err);
-    res.status(500).json({ error: 'Fehler.' });
-  }
-});
-
-// ── PUT /api/admin/notifications/read-all ────────────────────
-// Alle Notifications als gelesen markieren
-router.put('/notifications/read-all', async (req, res) => {
-  try {
-    await pool.query('UPDATE admin_notifications SET read = true WHERE read = false');
-    res.json({ message: 'Alle gelesen.' });
-  } catch (err) {
-    console.error('Mark all read error:', err);
     res.status(500).json({ error: 'Fehler.' });
   }
 });
