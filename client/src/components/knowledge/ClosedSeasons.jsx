@@ -208,6 +208,34 @@ const ADDITIONAL_SPECIES = [
     kremsNote: 'Seltene Art, die in naturnahen Abschnitten der Krems vorkommen kann. Empfindlich gegenüber Verbauung und Sedimenteintrag. EU-weit geschützt.',
     status: 'Ganzjährig geschont',
   },
+  {
+    key: 'brook_lamprey',
+    name: 'Bachneunauge',
+    latin: 'Lampetra planeri',
+    probability: 10,
+    label: 'Sehr selten',
+    min_size_cm: null,
+    season_start: '01-01',
+    season_end: '12-31',
+    year_round: true,
+    habitat: 'Kleinere und größere Bäche mit sandigem Grund und kühlen Sommertemperaturen. Larven (Querder) leben eingegraben im Sediment.',
+    kremsNote: 'Alle Neunaugenarten sind in OÖ sehr selten geworden. In der Krems theoretisch möglich in sandigen Abschnitten. Ganzjährig geschont, kein Brittelmaß.',
+    status: 'Ganzjährig geschont',
+  },
+  {
+    key: 'stone_crayfish',
+    name: 'Steinkrebs',
+    latin: 'Austropotamobius torrentium',
+    probability: 10,
+    label: 'Sehr selten',
+    min_size_cm: null,
+    season_start: '01-01',
+    season_end: '12-31',
+    year_round: true,
+    habitat: 'Quellregionen und Oberläufe kühler Gewässer mit steinigem Grund, sauberes Wasser, Sommertemperatur mind. 10°C.',
+    kremsNote: 'Vorkommen auf Quellregionen und Oberläufe beschränkt. Durch Signalkrebs (Krebspest) und Gewässerverbauung stark gefährdet. EU-weit geschützt (FFH-Richtlinie).',
+    status: 'Ganzjährig geschont',
+  },
 ];
 
 // Berechnet ob eine Art gerade Schonzeit hat (gleiche Logik wie Backend)
@@ -589,7 +617,7 @@ export default function ClosedSeasons() {
 
       <p className="mt-4 text-xs text-gray-400">
         Quelle Befischbare Arten: Fischereierlaubnis Hauserwasser 2026 (mit Sondermassen).
-        Quelle Begleitfauna: OÖ Fischereiverordnung, lfvooe.at (gültig ab 01.10.2020).
+        Quelle Begleitfauna: OÖ Fischereiverordnung und lfvooe.at/fischarten (gültig ab 01.10.2020).
         Weitere Infos: lfvooe.at
       </p>
       <p className="mt-1 text-xs text-gray-400">
