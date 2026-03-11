@@ -14,6 +14,57 @@ let cachedAnalysis = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 60 * 60 * 1000; // 1 Stunde
 
+/**
+ * Versucht aus einem beliebigen String valides JSON zu extrahieren.
+ */
+function extractJSON(raw) {
+  if (!raw || !raw.trim()) return null;
+
+  let str = raw.trim();
+
+  // 1) Code-Block entfernen: ```json ... ``` oder ``` ... ```
+  const codeBlock = str.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlock) {
+    str = codeBlock[1].trim();
+  }
+
+  // 2) Erstes { bis letztes } extrahieren
+  const firstBrace = str.indexOf('{');
+  const lastBrace = str.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    str = str.substring(firstBrace, lastBrace + 1);
+  }
+
+  // 3) Direkt parsen
+  try {
+    return JSON.parse(str);
+  } catch (_) {
+    // weiter versuchen
+  }
+
+  // 4) Trailing-Kommas entfernen und nochmal versuchen
+  try {
+    const cleaned = str.replace(/,\s*([\]}])/g, '$1');
+    return JSON.parse(cleaned);
+  } catch (_) {
+    // weiter versuchen
+  }
+
+  // 5) Steuerzeichen und unsichtbare Zeichen entfernen
+  try {
+    const sanitized = str
+      .replace(/[\x00-\x1F\x7F]/g, ' ')  // Control chars → Space
+      .replace(/\n/g, '\\n')               // Newlines escapen
+      .replace(/\r/g, '')
+      .replace(/\t/g, '\\t');
+    return JSON.parse(sanitized);
+  } catch (_) {
+    // aufgeben
+  }
+
+  return null;
+}
+
 router.get('/analyse', async (req, res) => {
   try {
     const forceRefresh = req.query.refresh === 'true';
@@ -34,41 +85,36 @@ router.get('/analyse', async (req, res) => {
     }
 
     const prompt = `Du bist ein Experte für Limnologie und Fischereimanagement in Österreich.
-Analysiere den Flussabschnitt der "Krems" in Oberösterreich zwischen den folgenden Koordinaten:
+Analysiere den Flussabschnitt der "Krems" in Oberösterreich zwischen:
 - Oberkante (Piberbach/Kematen): 48.117156, 14.210667
 - Unterkante (Neuhofen an der Krems): 48.130520, 14.225703
-Erstelle eine detaillierte Analyse für ein nachhaltiges Besatzmanagement.
-Antworte AUSSCHLIESSLICH im JSON-Format mit folgender Struktur:
+
+Antworte NUR mit einem JSON-Objekt, KEIN anderer Text davor oder danach:
 {
   "gewaesser_info": {
     "name": "Krems (OÖ)",
     "region": "Traun-Enns-Platte",
     "fischregion_typ": "Untere Forellenregion / Äschenregion",
-    "charakteristik": "string"
+    "charakteristik": "kurze Beschreibung"
   },
   "fischarten_inventar": [
     {
-      "name": "string",
-      "wissenschaftlicher_name": "string",
-      "vorkommen": "natürlich / Besatz / selten",
-      "besatz_empfehlung": "hoch / mittel / niedrig / nein",
-      "management_hinweis": "string"
+      "name": "Fischart",
+      "wissenschaftlicher_name": "Lateinisch",
+      "vorkommen": "natürlich",
+      "besatz_empfehlung": "hoch",
+      "management_hinweis": "Hinweis"
     }
   ],
-  "strategische_empfehlungen": [
-    "string",
-    "string"
-  ],
-  "oekologischer_zustand_prognose": "string"
-}
-Berücksichtige bei der Analyse die spezifische Topografie (Mäandrierung, landwirtschaftlicher Eintrag, Durchgängigkeit) dieses Abschnitts.`;
+  "strategische_empfehlungen": ["Empfehlung 1", "Empfehlung 2"],
+  "oekologischer_zustand_prognose": "Prognose"
+}`;
 
     console.log('[Revier] Starte Gemini-Analyse...');
 
-    // gemini-2.0-flash ist schnell genug für Render Free (30s Timeout)
-    // gemini-2.5-flash ist ein "Thinking"-Modell und braucht oft >30s
-    const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash'];
-    let data = null;
+    // Modelle in Reihenfolge versuchen
+    const GEMINI_MODELS = ['gemini-2.0-flash'];
+    let textContent = '';
     let lastError = null;
 
     for (const model of GEMINI_MODELS) {
@@ -82,77 +128,74 @@ Berücksichtige bei der Analyse die spezifische Topografie (Mäandrierung, landw
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: {
-                temperature: 0.3,
+                temperature: 0.2,
                 maxOutputTokens: 2048,
-                responseMimeType: 'application/json',
               },
             }),
-            signal: AbortSignal.timeout(25000), // Render Free: 30s Timeout
+            signal: AbortSignal.timeout(25000),
           }
         );
 
         if (!response.ok) {
           const errText = await response.text().catch(() => '');
-          console.error(`[Revier] ${model} API Error:`, response.status, errText.substring(0, 300));
+          console.error(`[Revier] ${model} HTTP ${response.status}:`, errText.substring(0, 500));
           lastError = `Gemini API Fehler (${model}, HTTP ${response.status})`;
-          continue; // nächstes Modell versuchen
+          continue;
         }
 
-        data = await response.json();
-        console.log(`[Revier] Erfolgreich mit Modell: ${model}`);
+        const data = await response.json();
+
+        // Detailliertes Logging der Response-Struktur
+        const candidate = data.candidates?.[0];
+        if (!candidate) {
+          console.error(`[Revier] ${model}: Keine candidates in Response.`, JSON.stringify(data).substring(0, 500));
+          lastError = `${model}: Keine Antwort erhalten (candidates leer)`;
+          continue;
+        }
+
+        if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+          console.warn(`[Revier] ${model}: finishReason=${candidate.finishReason}`);
+        }
+
+        textContent = candidate.content?.parts?.[0]?.text || '';
+        if (!textContent) {
+          console.error(`[Revier] ${model}: Leere Textantwort. Parts:`, JSON.stringify(candidate.content?.parts || []).substring(0, 300));
+          lastError = `${model}: Leere Antwort erhalten`;
+          continue;
+        }
+
+        console.log(`[Revier] ${model} OK, ${textContent.length} Zeichen`);
+        console.log('[Revier] Antwort (erste 300):', textContent.substring(0, 300));
         break; // Erfolg
       } catch (fetchErr) {
-        console.error(`[Revier] ${model} Fetch Error:`, fetchErr.message);
+        console.error(`[Revier] ${model} Fehler:`, fetchErr.message);
         lastError = fetchErr.message;
         continue;
       }
     }
 
-    if (!data) {
+    if (!textContent) {
       return res.status(502).json({
-        error: lastError || 'Alle Gemini-Modelle fehlgeschlagen',
+        error: lastError || 'Keine Antwort von Gemini erhalten',
       });
     }
 
-    const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    // JSON extrahieren
+    const analysis = extractJSON(textContent);
 
-    console.log('[Revier] Gemini Response (first 500 chars):', textContent.substring(0, 500));
-
-    // JSON aus Antwort extrahieren
-    let jsonStr = textContent.trim();
-
-    // Falls in Code-Block gewrappt
-    const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (codeBlockMatch) {
-      jsonStr = codeBlockMatch[1].trim();
+    if (!analysis) {
+      console.error('[Revier] JSON-Extraktion fehlgeschlagen. Kompletter Text:', textContent.substring(0, 1000));
+      return res.status(502).json({
+        error: 'Gemini hat kein gültiges JSON geliefert. Bitte erneut versuchen.',
+      });
     }
 
-    // Falls noch kein reines JSON, versuche JSON-Objekt zu finden
-    if (!jsonStr.startsWith('{')) {
-      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        jsonStr = jsonMatch[0];
-      }
-    }
-
-    let analysis;
-    try {
-      analysis = JSON.parse(jsonStr);
-    } catch (parseErr) {
-      console.error('[Revier] JSON Parse Fehler. Raw (500 chars):', jsonStr.substring(0, 500));
-      // Letzter Versuch: ungültige Trailing-Kommas entfernen
-      try {
-        const cleaned = jsonStr.replace(/,\s*([\]}])/g, '$1');
-        analysis = JSON.parse(cleaned);
-        console.log('[Revier] JSON nach Cleanup erfolgreich geparst');
-      } catch {
-        throw new SyntaxError('Ungültiges JSON von Gemini: ' + parseErr.message);
-      }
-    }
-
-    // Validierung: Erwartete Felder prüfen
+    // Validierung
     if (!analysis.gewaesser_info || !analysis.fischarten_inventar) {
-      throw new Error('Unvollständige Analyse-Daten von Gemini erhalten');
+      console.error('[Revier] Unvollständige Daten:', Object.keys(analysis));
+      return res.status(502).json({
+        error: 'Unvollständige Analyse von Gemini. Bitte erneut versuchen.',
+      });
     }
 
     cachedAnalysis = {
@@ -165,12 +208,7 @@ Berücksichtige bei der Analyse die spezifische Topografie (Mäandrierung, landw
 
     res.json({ ...cachedAnalysis, cached: false });
   } catch (err) {
-    console.error('[Revier] Fehler:', err.message);
-    if (err instanceof SyntaxError) {
-      return res.status(502).json({
-        error: 'Ungültiges JSON von Gemini erhalten. Bitte erneut versuchen.',
-      });
-    }
+    console.error('[Revier] Unerwarteter Fehler:', err.message, err.stack?.substring(0, 200));
     res.status(500).json({
       error: 'Revier-Analyse fehlgeschlagen: ' + err.message,
     });
