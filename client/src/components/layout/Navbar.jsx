@@ -7,7 +7,7 @@ const FISHER_ITEMS = [
   { path: '/', label: 'Dashboard' },
   { path: '/fang/neu', label: 'Neuer Fang' },
   { path: '/fangbuch', label: 'Fangbuch' },
-  { path: '/erkennung', label: 'Fisch-ID' },
+  { path: '/renaturierung?tab=dokumentation', label: 'Sichtungen' },
   { path: '/schonzeiten', label: 'Schonzeiten' },
   { path: '/regeln', label: 'Regeln' },
 ];
@@ -54,7 +54,7 @@ export default function Navbar() {
                 key={item.path}
                 to={item.path}
                 className={`relative px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  location.pathname === item.path
+                  (location.pathname + location.search) === item.path || location.pathname === item.path
                     ? 'bg-white/20 text-white'
                     : item.path === '/admin'
                       ? 'text-amber-300 hover:text-amber-200 hover:bg-white/10'

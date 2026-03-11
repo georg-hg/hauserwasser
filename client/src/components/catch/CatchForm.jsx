@@ -1,22 +1,41 @@
-import { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import { useCatches } from '../../hooks/useCatches';
 import { FISH_SPECIES, TECHNIQUES } from '../../utils/fishSpecies';
 import { isInClosedSeason } from '../../utils/seasonCheck';
+import { api } from '../../api/client';
 import MapComponent from '../map/MapComponent';
+
+const confidenceColors = {
+  hoch: 'text-green-700 bg-green-50 border-green-200',
+  mittel: 'text-yellow-700 bg-yellow-50 border-yellow-200',
+  niedrig: 'text-gray-500 bg-gray-50 border-gray-200',
+};
+
+const confidenceLabels = {
+  hoch: 'hohe Sicherheit',
+  mittel: 'mittlere Sicherheit',
+  niedrig: 'grobe Schätzung',
+};
 
 export default function CatchForm() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { position } = useGeolocation();
   const { addCatch } = useCatches();
   const fileRef = useRef(null);
 
+  // Pre-fill aus Fish-ID Redirect (Legacy-Support)
+  const prefillSpecies = searchParams.get('species') || '';
+  const prefillLength = searchParams.get('length') || '';
+  const prefillOrigin = searchParams.get('origin') || '';
+
   const [form, setForm] = useState({
     catchDate: new Date().toISOString().split('T')[0],
     catchTime: new Date().toTimeString().slice(0, 5),
-    fishSpecies: '',
-    lengthCm: '',
+    fishSpecies: prefillSpecies,
+    lengthCm: prefillLength,
     weightKg: '',
     technique: '',
     kept: false,
@@ -26,6 +45,11 @@ export default function CatchForm() {
   const [preview, setPreview] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Fish-ID Analyse State
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisApplied, setAnalysisApplied] = useState(!!prefillSpecies);
 
   const currentPos = selectedPos || position;
   const seasonWarning = form.fishSpecies ? isInClosedSeason(form.fishSpecies) : null;
@@ -41,6 +65,43 @@ export default function CatchForm() {
       const reader = new FileReader();
       reader.onload = (ev) => setPreview(ev.target.result);
       reader.readAsDataURL(file);
+      // Reset vorherige Analyse
+      setAnalysisResult(null);
+      setAnalysisApplied(false);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    const file = fileRef.current?.files?.[0];
+    if (!file) return;
+
+    setAnalyzing(true);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      const data = await api.upload('/api/fish-id/analyze', formData);
+      setAnalysisResult(data);
+
+      // Automatisch Formularfelder ausfüllen wenn Art erkannt
+      if (data.species && data.species !== 'unknown') {
+        setForm(prev => ({
+          ...prev,
+          fishSpecies: data.species,
+          ...(data.estimatedLength?.lengthCm ? { lengthCm: String(data.estimatedLength.lengthCm) } : {}),
+        }));
+        setAnalysisApplied(true);
+      } else if (data.estimatedLength?.lengthCm) {
+        setForm(prev => ({
+          ...prev,
+          lengthCm: String(data.estimatedLength.lengthCm),
+        }));
+      }
+    } catch (err) {
+      setError('Analyse fehlgeschlagen: ' + err.message);
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -92,6 +153,150 @@ export default function CatchForm() {
           <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">{error}</div>
         )}
 
+        {/* Foto & Fisch-Analyse */}
+        <div className="card space-y-3">
+          <label className="block text-sm font-medium text-gray-700">Foto aufnehmen</label>
+          <div
+            onClick={() => fileRef.current?.click()}
+            className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-primary-400 hover:bg-primary-50/50 transition-colors"
+          >
+            {preview ? (
+              <img src={preview} alt="Vorschau" className="max-h-48 mx-auto rounded-lg object-contain" />
+            ) : (
+              <div className="space-y-1">
+                <svg className="w-10 h-10 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <p className="text-sm text-gray-500">Foto aufnehmen oder hochladen</p>
+                <p className="text-xs text-gray-400">Art, Laenge & Herkunft werden automatisch erkannt</p>
+              </div>
+            )}
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="hidden" />
+
+          {/* Analyse-Button */}
+          {preview && !analysisApplied && !analyzing && (
+            <button
+              type="button"
+              onClick={handleAnalyze}
+              className="btn-primary w-full flex items-center justify-center gap-2 text-sm"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+              </svg>
+              Fisch analysieren (Art, Laenge, Herkunft)
+            </button>
+          )}
+
+          {/* Analysiert-Hinweis */}
+          {analyzing && (
+            <div className="flex items-center justify-center gap-2 py-3 text-sm text-gray-500">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500" />
+              Analysiere Art, Laenge & Herkunft...
+            </div>
+          )}
+
+          {/* Analyse-Ergebnis */}
+          {analysisResult && analysisResult.species !== 'unknown' && (
+            <div className="space-y-2">
+              <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-green-800">{analysisResult.speciesGerman}</span>
+                    <span className="text-xs text-green-600 ml-2">
+                      {Math.round(analysisResult.confidence * 100)}%
+                    </span>
+                  </div>
+                  <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">erkannt</span>
+                </div>
+              </div>
+
+              {/* Herkunft */}
+              {analysisResult.origin && analysisResult.origin.type !== 'unklar' && (
+                <div className={`rounded-lg p-3 border ${
+                  analysisResult.origin.type === 'wildfisch'
+                    ? 'bg-emerald-50 border-emerald-200'
+                    : 'bg-orange-50 border-orange-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span>{analysisResult.origin.type === 'wildfisch' ? '🐟' : '🏭'}</span>
+                      <span className={`font-bold text-sm ${
+                        analysisResult.origin.type === 'wildfisch' ? 'text-emerald-800' : 'text-orange-800'
+                      }`}>
+                        {analysisResult.origin.type === 'wildfisch' ? 'Wildfisch' : 'Besatzfisch'}
+                      </span>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      analysisResult.origin.confidence === 'hoch'
+                        ? 'bg-green-100 text-green-700'
+                        : analysisResult.origin.confidence === 'mittel'
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {confidenceLabels[analysisResult.origin.confidence] || 'Schaetzung'}
+                    </span>
+                  </div>
+                  {analysisResult.origin.hint && (
+                    <p className={`text-xs mt-1 ${
+                      analysisResult.origin.type === 'wildfisch' ? 'text-emerald-600' : 'text-orange-600'
+                    }`}>
+                      {analysisResult.origin.hint}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Laenge */}
+              {analysisResult.estimatedLength?.lengthCm && (
+                <div className={`rounded-lg p-3 border ${confidenceColors[analysisResult.estimatedLength.confidence] || confidenceColors.niedrig}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold">~{analysisResult.estimatedLength.lengthCm} cm</span>
+                    <span className="text-xs opacity-70">
+                      {confidenceLabels[analysisResult.estimatedLength.confidence] || 'Schaetzung'}
+                    </span>
+                  </div>
+                  {analysisResult.estimatedLength.hint && (
+                    <p className="text-xs mt-1 opacity-70">{analysisResult.estimatedLength.hint}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Schonzeit/Mindestmass-Warnung aus Analyse */}
+              {analysisResult.closedSeasonWarning && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-sm text-red-700 font-medium">{analysisResult.closedSeasonWarning}</p>
+                </div>
+              )}
+
+              {analysisResult.minSizeWarning && (
+                <div className={`border rounded-lg p-3 ${
+                  analysisResult.estimatedLength?.lengthCm && analysisResult.minSizeCm && analysisResult.estimatedLength.lengthCm < analysisResult.minSizeCm
+                    ? 'bg-red-50 border-red-200'
+                    : 'bg-yellow-50 border-yellow-200'
+                }`}>
+                  <p className={`text-sm font-medium ${
+                    analysisResult.estimatedLength?.lengthCm && analysisResult.minSizeCm && analysisResult.estimatedLength.lengthCm < analysisResult.minSizeCm
+                      ? 'text-red-700'
+                      : 'text-yellow-700'
+                  }`}>
+                    {analysisResult.minSizeWarning}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Art nicht erkannt */}
+          {analysisResult && analysisResult.species === 'unknown' && (
+            <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
+              <p className="text-sm text-yellow-700 font-medium">Art nicht erkannt</p>
+              <p className="text-xs text-yellow-600 mt-0.5">{analysisResult.note} Bitte unten manuell auswaehlen.</p>
+            </div>
+          )}
+        </div>
+
         {/* Karte */}
         <div className="card p-0 overflow-hidden">
           <div className="p-3 pb-1">
@@ -120,7 +325,10 @@ export default function CatchForm() {
 
         {/* Fischart */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Fischart *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Fischart *
+            {analysisApplied && <span className="text-green-600 text-xs ml-2">(automatisch erkannt)</span>}
+          </label>
           <select value={form.fishSpecies} onChange={update('fishSpecies')} className="input-field" required>
             <option value="">Bitte waehlen...</option>
             {FISH_SPECIES.map((s) => (
@@ -140,7 +348,12 @@ export default function CatchForm() {
         {/* Masse */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Laenge (cm)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Laenge (cm)
+              {analysisResult?.estimatedLength?.lengthCm && analysisApplied && (
+                <span className="text-green-600 text-xs ml-1">(geschaetzt)</span>
+              )}
+            </label>
             <input type="number" step="0.1" min="0" value={form.lengthCm} onChange={update('lengthCm')} className="input-field" placeholder="z.B. 32.5" />
           </div>
           <div>
@@ -158,28 +371,6 @@ export default function CatchForm() {
               <option key={t.key} value={t.key}>{t.label}</option>
             ))}
           </select>
-        </div>
-
-        {/* Foto */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Foto</label>
-          <div
-            onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-primary-400 hover:bg-primary-50/50 transition-colors"
-          >
-            {preview ? (
-              <img src={preview} alt="Vorschau" className="max-h-40 mx-auto rounded-lg object-contain" />
-            ) : (
-              <div className="space-y-1">
-                <svg className="w-8 h-8 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <p className="text-xs text-gray-500">Foto aufnehmen oder hochladen</p>
-              </div>
-            )}
-          </div>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="hidden" />
         </div>
 
         {/* Entnommen */}
