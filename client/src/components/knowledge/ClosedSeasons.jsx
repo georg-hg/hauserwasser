@@ -78,9 +78,8 @@ const FISH_HABITAT = {
 };
 
 /**
- * Weitere Arten, die im Kremsabschnitt vorkommen, aber NICHT in der
- * Fischereierlaubnis mit Schonzeiten/Mindestmaßen gelistet sind.
- * Typische Begleitfauna der Unteren Forellenregion / Äschenregion.
+ * Weitere Arten im Kremsabschnitt mit gesetzlichen Schonzeiten gem. OÖ Fischereiverordnung.
+ * Quelle: lfvooe.at / OÖ Fischereiverordnung (gültig ab 01.10.2020)
  */
 const ADDITIONAL_SPECIES = [
   {
@@ -89,6 +88,10 @@ const ADDITIONAL_SPECIES = [
     latin: 'Cottus gobio',
     probability: 90,
     label: 'Leitart',
+    min_size_cm: 8,
+    season_start: '02-01',
+    season_end: '04-30',
+    year_round: false,
     habitat: 'Kühle, sauerstoffreiche Bäche mit steinigem Substrat, Verstecke unter Steinen und Totholz, saubere Gewässersohle.',
     kremsNote: 'Die Koppe ist eine der häufigsten Kleinfischarten in der Krems. Sie lebt am Gewässergrund zwischen Steinen und ist ein wichtiger Indikator für gute Gewässerqualität. EU-weit geschützt (FFH-Richtlinie).',
     status: 'FFH-geschützt',
@@ -99,6 +102,10 @@ const ADDITIONAL_SPECIES = [
     latin: 'Barbatula barbatula',
     probability: 80,
     label: 'Häufig',
+    min_size_cm: 10,
+    season_start: '03-01',
+    season_end: '05-31',
+    year_round: false,
     habitat: 'Sandige bis kiesige Gewässersohle, moderate Strömung, sauberes Interstitial (Lückensystem im Kies).',
     kremsNote: 'Häufige Kleinfischart am Gewässergrund der Krems. Nachtaktiver Bodenfisch, der tagsüber unter Steinen lebt. Wichtig als Nahrung für Forellen.',
     status: 'Begleitart',
@@ -109,6 +116,10 @@ const ADDITIONAL_SPECIES = [
     latin: 'Phoxinus phoxinus',
     probability: 70,
     label: 'Häufig',
+    min_size_cm: 8,
+    season_start: '04-01',
+    season_end: '05-31',
+    year_round: false,
     habitat: 'Klare, kühle Fließgewässer mit kiesigem Grund, lebt in Schwärmen, braucht gute Wasserqualität und Sauerstoffgehalt.',
     kremsNote: 'Typischer Schwarmfisch in der Krems, bevorzugt flache Rieselstrecken. Guter Bioindikator – ihr Vorkommen zeigt intakte Gewässerverhältnisse. Wichtige Futterfischart für Forellen.',
     status: 'Begleitart',
@@ -119,6 +130,10 @@ const ADDITIONAL_SPECIES = [
     latin: 'Chondrostoma nasus',
     probability: 25,
     label: 'Selten',
+    min_size_cm: 35,
+    season_start: '03-16',
+    season_end: '05-31',
+    year_round: false,
     habitat: 'Mittelgroße bis große Flüsse, kiesige Laichplätze mit stärkerer Strömung, Algenbewuchs als Nahrungsquelle, durchgängige Wanderstrecken.',
     kremsNote: 'Die Nase benötigt Wandermöglichkeiten zum Laichen. Im Kremsabschnitt durch Querbauwerke eingeschränkt. Wichtige Art für die Gewässerökologie, Bestand rückläufig.',
     status: 'Gefährdet (RL Ö)',
@@ -129,9 +144,13 @@ const ADDITIONAL_SPECIES = [
     latin: 'Alburnoides bipunctatus',
     probability: 35,
     label: 'Gelegentlich',
+    min_size_cm: null,
+    season_start: '01-01',
+    season_end: '12-31',
+    year_round: true,
     habitat: 'Klare, schnell fließende Gewässer mit Kiesgrund, lebt in kleinen Schwärmen nahe der Oberfläche, braucht sauberes Wasser.',
     kremsNote: 'Typische Begleitart der Äschenregion. Guter Indikator für naturnahe Fließgewässer. In der Krems in geeigneten Abschnitten mit Kiesbänken anzutreffen.',
-    status: 'Gefährdet (RL Ö)',
+    status: 'Ganzjährig geschont',
   },
   {
     key: 'gudgeon',
@@ -139,6 +158,10 @@ const ADDITIONAL_SPECIES = [
     latin: 'Gobio gobio',
     probability: 65,
     label: 'Häufig',
+    min_size_cm: 10,
+    season_start: '05-01',
+    season_end: '05-31',
+    year_round: false,
     habitat: 'Sand- und Kiesgrund, moderate Strömung, anpassungsfähig bei Wasserqualität, gräbt im Substrat nach Nahrung.',
     kremsNote: 'Häufiger Bodenfisch in der Krems, besonders an sandigen Stellen und in ruhigeren Gleithängen der Mäander. Robust und anpassungsfähig.',
     status: 'Begleitart',
@@ -149,6 +172,10 @@ const ADDITIONAL_SPECIES = [
     latin: 'Leuciscus leuciscus',
     probability: 30,
     label: 'Gelegentlich',
+    min_size_cm: 20,
+    season_start: '03-16',
+    season_end: '05-31',
+    year_round: false,
     habitat: 'Kühle bis mäßig warme Fließgewässer, kiesiger Grund, moderate Strömung, lebt in kleinen Gruppen.',
     kremsNote: 'In der Krems vor allem im Übergangsbereich zur Äschenregion. Verwandt mit dem Aitel, aber kleiner und empfindlicher gegenüber Gewässerbelastung.',
     status: 'Begleitart',
@@ -159,6 +186,10 @@ const ADDITIONAL_SPECIES = [
     latin: 'Lota lota',
     probability: 15,
     label: 'Sehr selten',
+    min_size_cm: 40,
+    season_start: '11-16',
+    season_end: '02-28',
+    year_round: false,
     habitat: 'Kalte, sauerstoffreiche Gewässer, tiefere Bereiche und Kolke, steinig-kiesiger Grund, nachtaktiver Winterlaicher.',
     kremsNote: 'Einziger Süßwasser-Dorsch Europas. In der Krems nur noch selten, bevorzugt tiefe Kolke. Laicht im Winter (Dez–Feb) und braucht kaltes Wasser. Bestand stark rückläufig.',
     status: 'Gefährdet (RL Ö)',
@@ -169,11 +200,29 @@ const ADDITIONAL_SPECIES = [
     latin: 'Telestes souffia',
     probability: 20,
     label: 'Selten',
+    min_size_cm: null,
+    season_start: '01-01',
+    season_end: '12-31',
+    year_round: true,
     habitat: 'Schnell fließende, klare Gewässer mit grobem Kies, sauerstoffreich, typisch für die Äschenregion.',
     kremsNote: 'Seltene Art, die in naturnahen Abschnitten der Krems vorkommen kann. Empfindlich gegenüber Verbauung und Sedimenteintrag. EU-weit geschützt.',
-    status: 'FFH-geschützt',
+    status: 'Ganzjährig geschont',
   },
 ];
+
+// Berechnet ob eine Art gerade Schonzeit hat (gleiche Logik wie Backend)
+function checkClosed(art) {
+  if (art.year_round) return true;
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const current = `${month}-${day}`;
+  if (art.season_start <= art.season_end) {
+    return current >= art.season_start && current <= art.season_end;
+  }
+  // Über Jahreswechsel (z.B. 11-16 bis 02-28)
+  return current >= art.season_start || current <= art.season_end;
+}
 
 const PROBABILITY_COLORS = {
   high: { bar: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
@@ -381,7 +430,7 @@ export default function ClosedSeasons() {
       <div className="mt-8">
         <h2 className="text-lg font-bold text-gray-900 mb-1">Weitere Arten im Revier</h2>
         <p className="text-sm text-gray-500 mb-3">
-          Begleitfauna im Kremsabschnitt Piberbach–Neuhofen (ohne Fangregulierung)
+          Begleitfauna mit gesetzl. Schonzeiten gem. OÖ Fischereiverordnung
         </p>
 
         {/* Desktop-Tabelle */}
@@ -391,6 +440,8 @@ export default function ClosedSeasons() {
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left p-3 font-semibold text-gray-700">Art</th>
                 <th className="text-center p-3 font-semibold text-gray-700">Vorkommen</th>
+                <th className="text-center p-3 font-semibold text-gray-700">Mindestmass</th>
+                <th className="text-center p-3 font-semibold text-gray-700">Schonzeit</th>
                 <th className="text-center p-3 font-semibold text-gray-700">Status</th>
               </tr>
             </thead>
@@ -398,6 +449,7 @@ export default function ClosedSeasons() {
               {ADDITIONAL_SPECIES.map((art) => {
                 const isExpanded = expandedFish === art.key;
                 const color = getProbabilityColor(art.probability);
+                const isClosed = checkClosed(art);
 
                 return (
                   <tr key={art.key} className="border-b border-gray-100 last:border-0">
@@ -433,13 +485,29 @@ export default function ClosedSeasons() {
                       </button>
                     </td>
                     <td className="p-3 text-center">
+                      {art.min_size_cm ? `${art.min_size_cm} cm` : '-'}
+                    </td>
+                    <td className="p-3 text-center text-gray-600">
+                      {art.year_round
+                        ? 'Ganzjährig'
+                        : `${formatDate(art.season_start)} - ${formatDate(art.season_end)}`}
+                    </td>
+                    <td className="p-3 text-center">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                        art.status.includes('FFH') ? 'bg-purple-100 text-purple-700' :
-                        art.status.includes('Gefährdet') ? 'bg-amber-100 text-amber-700' :
-                        'bg-gray-100 text-gray-600'
+                        isClosed
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-green-100 text-green-700'
                       }`}>
-                        {art.status}
+                        {isClosed ? 'Schonzeit' : 'Befischbar'}
                       </span>
+                      {(art.status.includes('FFH') || art.status.includes('Gefährdet') || art.status.includes('Ganzjährig')) && (
+                        <span className={`block mt-1 inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          art.status.includes('FFH') || art.status.includes('Ganzjährig') ? 'bg-purple-100 text-purple-700' :
+                          'bg-amber-100 text-amber-700'
+                        }`}>
+                          {art.status}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -453,9 +521,12 @@ export default function ClosedSeasons() {
           {ADDITIONAL_SPECIES.map((art) => {
             const isExpanded = expandedFish === art.key;
             const color = getProbabilityColor(art.probability);
+            const isClosed = checkClosed(art);
 
             return (
-              <div key={art.key} className="card p-3 border-l-4 border-l-gray-300">
+              <div key={art.key} className={`card p-3 border-l-4 ${
+                isClosed ? 'border-l-red-400' : 'border-l-green-400'
+              }`}>
                 <button
                   onClick={() => toggleExpand(art.key)}
                   className="w-full text-left"
@@ -467,13 +538,23 @@ export default function ClosedSeasons() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      art.status.includes('FFH') ? 'bg-purple-100 text-purple-700' :
-                      art.status.includes('Gefährdet') ? 'bg-amber-100 text-amber-700' :
-                      'bg-gray-100 text-gray-600'
-                    }`}>
-                      {art.status}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {(art.status.includes('FFH') || art.status.includes('Gefährdet') || art.status.includes('Ganzjährig')) && (
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                          art.status.includes('FFH') || art.status.includes('Ganzjährig') ? 'bg-purple-100 text-purple-700' :
+                          'bg-amber-100 text-amber-700'
+                        }`}>
+                          {art.status}
+                        </span>
+                      )}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        isClosed
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-green-100 text-green-700'
+                      }`}>
+                        {isClosed ? 'Schonzeit' : 'Befischbar'}
+                      </span>
+                    </div>
                   </div>
                   <p className="text-xs italic text-gray-400 mt-0.5">{art.latin}</p>
                   <div className="flex items-center gap-2 mt-1.5">
@@ -484,6 +565,15 @@ export default function ClosedSeasons() {
                     <span className="text-[10px] text-gray-400 min-w-[60px] text-right">{art.label}</span>
                   </div>
                 </button>
+
+                <div className="mt-1.5 grid grid-cols-2 gap-x-4 text-xs text-gray-600">
+                  <span>Mindestmass: {art.min_size_cm ? `${art.min_size_cm} cm` : '-'}</span>
+                  <span>
+                    {art.year_round
+                      ? 'Ganzjährig geschont'
+                      : `${formatDate(art.season_start)} - ${formatDate(art.season_end)}`}
+                  </span>
+                </div>
 
                 {isExpanded && (
                   <div className="mt-2.5 p-2.5 bg-blue-50 rounded-lg text-xs space-y-1.5 border border-blue-100">
@@ -498,8 +588,8 @@ export default function ClosedSeasons() {
       </div>
 
       <p className="mt-4 text-xs text-gray-400">
-        Quelle: Fischereierlaubnis Hauserwasser 2026. Es gelten die Schonzeiten gem.
-        OOe Lizenzbuch mit Ausnahme Forelle & Saibling (Sondermass 26 cm).
+        Quelle Befischbare Arten: Fischereierlaubnis Hauserwasser 2026 (mit Sondermassen).
+        Quelle Begleitfauna: OÖ Fischereiverordnung, lfvooe.at (gültig ab 01.10.2020).
         Weitere Infos: lfvooe.at
       </p>
       <p className="mt-1 text-xs text-gray-400">
