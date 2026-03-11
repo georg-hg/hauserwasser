@@ -35,6 +35,7 @@ const BESATZ_PLAN = {
 };
 
 function BesatzSection() {
+  const [mapFullscreen, setMapFullscreen] = useState(false);
   const gesamtKg = BESATZ_PLAN.fische.reduce((sum, f) => sum + f.menge_kg, 0);
 
   // Static Map via Backend-Proxy (nutzt serverseitigen GOOGLE_MAPS_API_KEY)
@@ -45,6 +46,7 @@ function BesatzSection() {
     .map((s, i) => `markers=${encodeURIComponent(`color:red|label:${i + 1}|${s.lat},${s.lng}`)}`)
     .join('&');
   const staticMapUrl = `${API_URL}/api/revier/static-map?size=600x400&maptype=satellite&${markersParams}`;
+  const staticMapUrlHD = `${API_URL}/api/revier/static-map?size=1280x1024&scale=2&maptype=satellite&${markersParams}`;
 
   // Google Maps Embed mit allen Stellen als Wegpunkte
   const daysUntil = Math.ceil((new Date('2026-04-11') - new Date()) / (1000 * 60 * 60 * 24));
@@ -108,7 +110,8 @@ function BesatzSection() {
         {/* Besatzstellen-Karte */}
         <div>
           <p className="text-sm font-medium text-gray-700 mb-2">Besatzstellen</p>
-          <div className="rounded-lg overflow-hidden border border-gray-200">
+          <div className="relative rounded-lg overflow-hidden border border-gray-200 group cursor-pointer"
+               onClick={() => setMapFullscreen(true)}>
             <img
               src={staticMapUrl}
               alt="Besatzstellen Krems"
@@ -116,6 +119,15 @@ function BesatzSection() {
               loading="lazy"
               onError={(e) => { e.target.style.display = 'none'; }}
             />
+            {/* Vollbild-Button */}
+            <button
+              className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Vollbild"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+              </svg>
+            </button>
           </div>
 
           {/* Stellen-Liste */}
@@ -130,6 +142,49 @@ function BesatzSection() {
             ))}
           </div>
         </div>
+
+        {/* Vollbild-Overlay */}
+        {mapFullscreen && (
+          <div
+            className="fixed inset-0 z-50 bg-black/90 flex flex-col"
+            onClick={() => setMapFullscreen(false)}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 bg-black/50">
+              <h3 className="text-white font-medium text-sm">Besatzstellen Krems</h3>
+              <button
+                onClick={() => setMapFullscreen(false)}
+                className="text-white/80 hover:text-white p-1"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Karte (HD) */}
+            <div className="flex-1 flex items-center justify-center p-4 overflow-auto"
+                 onClick={e => e.stopPropagation()}>
+              <img
+                src={staticMapUrlHD}
+                alt="Besatzstellen Krems (Vollbild)"
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+            </div>
+
+            {/* Stellen-Legende */}
+            <div className="px-4 py-3 bg-black/50 flex flex-wrap gap-3 justify-center">
+              {BESATZ_PLAN.stellen.map((s, i) => (
+                <div key={i} className="flex items-center gap-1.5 text-xs text-white/90">
+                  <span className="flex-shrink-0 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[9px] font-bold">
+                    {i + 1}
+                  </span>
+                  {s.beschreibung}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

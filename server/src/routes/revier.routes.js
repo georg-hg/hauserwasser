@@ -129,12 +129,13 @@ router.get('/static-map', async (req, res) => {
       return res.status(503).json({ error: 'GOOGLE_MAPS_API_KEY nicht konfiguriert.' });
     }
 
-    const { size, maptype, markers } = req.query;
+    const { size, maptype, markers, scale } = req.query;
     const params = new URLSearchParams({
       size: size || '600x400',
       maptype: maptype || 'satellite',
       key: mapsKey,
     });
+    if (scale) params.set('scale', scale);
 
     // markers kann mehrfach vorkommen
     const markersArr = Array.isArray(markers) ? markers : (markers ? [markers] : []);
