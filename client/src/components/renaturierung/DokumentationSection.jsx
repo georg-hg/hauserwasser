@@ -6,14 +6,14 @@ import MapComponent from '../map/MapComponent';
 
 // ── Konstanten ──
 const PREDATOR_TYPES = [
-  { key: 'fischotter', label: 'Fischotter', color: '#8B4513', icon: '🦦' },
-  { key: 'kormoran', label: 'Kormoran', color: '#1a1a1a', icon: '🐦‍⬛' },
-  { key: 'gaensesaeger', label: 'Gänsesäger', color: '#2563EB', icon: '🦆' },
-  { key: 'fischreiher', label: 'Fischreiher', color: '#6B7280', icon: '🪿' },
-  { key: 'graureiher', label: 'Graureiher', color: '#9CA3AF', icon: '🪿' },
-  { key: 'silberreiher', label: 'Silberreiher', color: '#E5E7EB', icon: '🪿' },
-  { key: 'mink', label: 'Mink', color: '#4B2E2E', icon: '🦡' },
-  { key: 'sonstiges', label: 'Sonstiges', color: '#F59E0B', icon: '❓' },
+  { key: 'fischotter', label: 'Fischotter', color: '#8B4513' },
+  { key: 'kormoran', label: 'Kormoran', color: '#1a1a1a' },
+  { key: 'gaensesaeger', label: 'Gänsesäger', color: '#2563EB' },
+  { key: 'fischreiher', label: 'Fischreiher', color: '#6B7280' },
+  { key: 'graureiher', label: 'Graureiher', color: '#9CA3AF' },
+  { key: 'silberreiher', label: 'Silberreiher', color: '#E5E7EB' },
+  { key: 'biber', label: 'Biber', color: '#92400E' },
+  { key: 'sonstiges', label: 'Sonstiges', color: '#F59E0B' },
 ];
 
 const BEHAVIORS = [
@@ -32,9 +32,7 @@ function getPredatorLabel(type) {
   return PREDATOR_TYPES.find(p => p.key === type)?.label || type;
 }
 
-function getPredatorIcon(type) {
-  return PREDATOR_TYPES.find(p => p.key === type)?.icon || '❓';
-}
+
 
 function getBehaviorLabel(key) {
   return BEHAVIORS.find(b => b.key === key)?.label || key || '–';
@@ -145,7 +143,7 @@ function SightingForm({ onSubmit, onCancel, position }) {
         <select value={form.predatorType} onChange={update('predatorType')} className="input-field" required>
           <option value="">Bitte wählen...</option>
           {PREDATOR_TYPES.map((p) => (
-            <option key={p.key} value={p.key}>{p.icon} {p.label}</option>
+            <option key={p.key} value={p.key}>{p.label}</option>
           ))}
         </select>
       </div>
@@ -222,10 +220,13 @@ function SightingCard({ sighting, onDelete, isAdmin }) {
           />
         ) : (
           <div
-            className="w-14 h-14 rounded-lg flex items-center justify-center text-2xl"
+            className="w-14 h-14 rounded-lg flex items-center justify-center"
             style={{ backgroundColor: getPredatorColor(sighting.predatorType) + '20' }}
           >
-            {getPredatorIcon(sighting.predatorType)}
+            <span
+              className="w-6 h-6 rounded-full"
+              style={{ backgroundColor: getPredatorColor(sighting.predatorType) }}
+            />
           </div>
         )}
       </div>
@@ -343,7 +344,10 @@ function StatsOverview({ stats }) {
       </div>
       {stats.byType.map(t => (
         <div key={t.type} className="card p-3 flex items-center gap-2">
-          <span className="text-lg">{getPredatorIcon(t.type)}</span>
+          <span
+            className="w-4 h-4 rounded-full flex-shrink-0"
+            style={{ backgroundColor: getPredatorColor(t.type) }}
+          />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-700 truncate">{getPredatorLabel(t.type)}</p>
             <p className="text-xs text-gray-400">{t.sightings}× gesehen · {t.individuals} Ind.</p>
@@ -512,7 +516,7 @@ export default function DokumentationSection() {
               >
                 <option value="">Alle Arten</option>
                 {PREDATOR_TYPES.map(p => (
-                  <option key={p.key} value={p.key}>{p.icon} {p.label}</option>
+                  <option key={p.key} value={p.key}>{p.label}</option>
                 ))}
               </select>
             </div>
@@ -556,7 +560,7 @@ export default function DokumentationSection() {
             >
               <option value="">Alle Arten</option>
               {PREDATOR_TYPES.map(p => (
-                <option key={p.key} value={p.key}>{p.icon} {p.label}</option>
+                <option key={p.key} value={p.key}>{p.label}</option>
               ))}
             </select>
           </div>
