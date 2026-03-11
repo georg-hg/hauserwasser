@@ -42,8 +42,15 @@ router.get('/analyse', async (req, res) => {
       return res.status(503).json({ error: 'GEMINI_API_KEY nicht konfiguriert.' });
     }
 
-    const prompt = `Gib ein JSON-Objekt zurueck ueber den Fluss Krems in Oberoesterreich (Forellenregion, Abschnitt Piberbach bis Neuhofen). Keine Erklaerung, nur JSON:
-{"gewaesser_info":{"name":"Krems","region":"...","fischregion_typ":"...","charakteristik":"..."},"fischarten_inventar":[{"name":"...","wissenschaftlicher_name":"...","vorkommen":"natuerlich/Besatz/selten","besatz_empfehlung":"hoch/mittel/niedrig/nein","management_hinweis":"..."}],"strategische_empfehlungen":["..."],"oekologischer_zustand_prognose":"..."}`;
+    const prompt = `Du bist ein Experte fuer Limnologie und Fischereimanagement in Oesterreich.
+Analysiere den Flussabschnitt der "Krems" in Oberoesterreich zwischen den folgenden Koordinaten:
+- Oberkante (Piberbach/Kematen): 48.117156, 14.210667
+- Unterkante (Neuhofen an der Krems): 48.130520, 14.225703
+
+Erstelle eine detaillierte Analyse fuer ein nachhaltiges Besatzmanagement.
+
+Antworte ausschliesslich mit einem JSON-Objekt in dieser Struktur:
+{"gewaesser_info":{"name":"Krems (OOe)","region":"...","fischregion_typ":"...","charakteristik":"..."},"fischarten_inventar":[{"name":"...","wissenschaftlicher_name":"...","vorkommen":"natuerlich/Besatz/selten","besatz_empfehlung":"hoch/mittel/niedrig/nein","management_hinweis":"..."}],"strategische_empfehlungen":["..."],"oekologischer_zustand_prognose":"..."}`;
 
     console.log('[Revier] Starte Analyse...');
 
@@ -54,7 +61,7 @@ router.get('/analyse', async (req, res) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+          generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
         }),
         signal: AbortSignal.timeout(25000),
       }
