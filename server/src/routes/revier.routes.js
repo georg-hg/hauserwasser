@@ -65,8 +65,9 @@ Berücksichtige bei der Analyse die spezifische Topografie (Mäandrierung, landw
 
     console.log('[Revier] Starte Gemini-Analyse...');
 
-    // Gemini Modell: gemini-2.5-flash (aktuelles Produktionsmodell)
-    const GEMINI_MODELS = ['gemini-2.5-flash'];
+    // gemini-2.0-flash ist schnell genug für Render Free (30s Timeout)
+    // gemini-2.5-flash ist ein "Thinking"-Modell und braucht oft >30s
+    const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash'];
     let data = null;
     let lastError = null;
 
@@ -82,11 +83,11 @@ Berücksichtige bei der Analyse die spezifische Topografie (Mäandrierung, landw
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: {
                 temperature: 0.3,
-                maxOutputTokens: 4096,
+                maxOutputTokens: 2048,
                 responseMimeType: 'application/json',
               },
             }),
-            signal: AbortSignal.timeout(60000),
+            signal: AbortSignal.timeout(25000), // Render Free: 30s Timeout
           }
         );
 
