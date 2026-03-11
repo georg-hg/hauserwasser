@@ -102,4 +102,42 @@ Antworte ausschliesslich mit einem JSON-Objekt in dieser Struktur:
   }
 });
 
+// ── Static Map Proxy (nutzt serverseitigen GOOGLE_MAPS_API_KEY) ──
+router.get('/static-map', async (req, res) => {
+  try {
+    const mapsKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!mapsKey) {
+      return res.status(503).json({ error: 'GOOGLE_MAPS_API_KEY nicht konfiguriert.' });
+    }
+
+    const { size, maptype, markers } = req.query;
+    const params = new URLSearchParams({
+      size: size || '600x400',
+      maptype: maptype || 'satellite',
+      key: mapsKey,
+    });
+
+    // markers kann mehrfach vorkommen
+    const markersArr = Array.isArray(markers) ? markers : (markers ? [markers] : []);
+    markersArr.forEach(m => params.append('markers', m));
+
+    const url = `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+
+    if (!response.ok) {
+      console.error('[Revier] Static Map Error:', response.status);
+      return res.status(response.status).json({ error: 'Static Map Fehler' });
+    }
+
+    // Bild direkt durchleiten
+    res.set('Content-Type', response.headers.get('content-type') || 'image/png');
+    res.set('Cache-Control', 'public, max-age=86400'); // 24h Cache
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error('[Revier] Static Map Error:', err.message);
+    res.status(500).json({ error: 'Kartenfehler: ' + err.message });
+  }
+});
+
 module.exports = router;

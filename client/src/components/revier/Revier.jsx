@@ -36,13 +36,15 @@ const BESATZ_PLAN = {
 
 function BesatzSection() {
   const gesamtKg = BESATZ_PLAN.fische.reduce((sum, f) => sum + f.menge_kg, 0);
-  const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_KEY || '';
 
-  // Google Maps Static API mit Markern
-  const markers = BESATZ_PLAN.stellen
-    .map((s, i) => `markers=color:red%7Clabel:${i + 1}%7C${s.lat},${s.lng}`)
+  // Static Map via Backend-Proxy (nutzt serverseitigen GOOGLE_MAPS_API_KEY)
+  const API_URL = import.meta.env.VITE_API_URL
+    ? `https://${import.meta.env.VITE_API_URL}`
+    : '';
+  const markersParams = BESATZ_PLAN.stellen
+    .map((s, i) => `markers=${encodeURIComponent(`color:red|label:${i + 1}|${s.lat},${s.lng}`)}`)
     .join('&');
-  const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x400&maptype=satellite&${markers}&key=${mapsKey}`;
+  const staticMapUrl = `${API_URL}/api/revier/static-map?size=600x400&maptype=satellite&${markersParams}`;
 
   // Google Maps Embed mit allen Stellen als Wegpunkte
   const daysUntil = Math.ceil((new Date('2026-04-11') - new Date()) / (1000 * 60 * 60 * 24));
@@ -106,20 +108,15 @@ function BesatzSection() {
         {/* Besatzstellen-Karte */}
         <div>
           <p className="text-sm font-medium text-gray-700 mb-2">Besatzstellen</p>
-          {mapsKey ? (
-            <div className="rounded-lg overflow-hidden border border-gray-200">
-              <img
-                src={staticMapUrl}
-                alt="Besatzstellen Krems"
-                className="w-full h-auto"
-                loading="lazy"
-              />
-            </div>
-          ) : (
-            <div className="bg-gray-100 rounded-lg p-4 text-center text-sm text-gray-500">
-              Google Maps Key nicht konfiguriert
-            </div>
-          )}
+          <div className="rounded-lg overflow-hidden border border-gray-200">
+            <img
+              src={staticMapUrl}
+              alt="Besatzstellen Krems"
+              className="w-full h-auto"
+              loading="lazy"
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+          </div>
 
           {/* Stellen-Liste */}
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
