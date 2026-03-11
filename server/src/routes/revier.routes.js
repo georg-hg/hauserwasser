@@ -65,49 +65,89 @@ Berücksichtige bei der Analyse die spezifische Topografie (Mäandrierung, landw
 
     console.log('[Revier] Starte Gemini-Analyse...');
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 4096,
-          },
-        }),
-        signal: AbortSignal.timeout(60000),
-      }
-    );
+    // Gemini Modell: gemini-2.0-flash als Standard, Fallback auf 1.5-flash
+    const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+    let data = null;
+    let lastError = null;
 
-    if (!response.ok) {
-      const errText = await response.text().catch(() => '');
-      console.error('[Revier] Gemini API Error:', response.status, errText.substring(0, 300));
+    for (const model of GEMINI_MODELS) {
+      try {
+        console.log(`[Revier] Versuche Modell: ${model}`);
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.3,
+                maxOutputTokens: 4096,
+                responseMimeType: 'application/json',
+              },
+            }),
+            signal: AbortSignal.timeout(60000),
+          }
+        );
+
+        if (!response.ok) {
+          const errText = await response.text().catch(() => '');
+          console.error(`[Revier] ${model} API Error:`, response.status, errText.substring(0, 300));
+          lastError = `Gemini API Fehler (${model}, HTTP ${response.status})`;
+          continue; // nächstes Modell versuchen
+        }
+
+        data = await response.json();
+        console.log(`[Revier] Erfolgreich mit Modell: ${model}`);
+        break; // Erfolg
+      } catch (fetchErr) {
+        console.error(`[Revier] ${model} Fetch Error:`, fetchErr.message);
+        lastError = fetchErr.message;
+        continue;
+      }
+    }
+
+    if (!data) {
       return res.status(502).json({
-        error: `Gemini API Fehler (HTTP ${response.status})`,
+        error: lastError || 'Alle Gemini-Modelle fehlgeschlagen',
       });
     }
 
-    const data = await response.json();
     const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     console.log('[Revier] Gemini Response (first 500 chars):', textContent.substring(0, 500));
 
-    // JSON aus Antwort extrahieren (kann in ```json ... ``` gewrappt sein)
-    let jsonStr = textContent;
-    const codeBlockMatch = textContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+    // JSON aus Antwort extrahieren
+    let jsonStr = textContent.trim();
+
+    // Falls in Code-Block gewrappt
+    const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (codeBlockMatch) {
       jsonStr = codeBlockMatch[1].trim();
-    } else {
-      // Versuche direkt JSON zu finden
-      const jsonMatch = textContent.match(/\{[\s\S]*\}/);
+    }
+
+    // Falls noch kein reines JSON, versuche JSON-Objekt zu finden
+    if (!jsonStr.startsWith('{')) {
+      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         jsonStr = jsonMatch[0];
       }
     }
 
-    const analysis = JSON.parse(jsonStr);
+    let analysis;
+    try {
+      analysis = JSON.parse(jsonStr);
+    } catch (parseErr) {
+      console.error('[Revier] JSON Parse Fehler. Raw (500 chars):', jsonStr.substring(0, 500));
+      // Letzter Versuch: ungültige Trailing-Kommas entfernen
+      try {
+        const cleaned = jsonStr.replace(/,\s*([\]}])/g, '$1');
+        analysis = JSON.parse(cleaned);
+        console.log('[Revier] JSON nach Cleanup erfolgreich geparst');
+      } catch {
+        throw new SyntaxError('Ungültiges JSON von Gemini: ' + parseErr.message);
+      }
+    }
 
     // Validierung: Erwartete Felder prüfen
     if (!analysis.gewaesser_info || !analysis.fischarten_inventar) {
