@@ -65,8 +65,8 @@ Berücksichtige bei der Analyse die spezifische Topografie (Mäandrierung, landw
 
     console.log('[Revier] Starte Gemini-Analyse...');
 
-    // Gemini Modell: gemini-2.0-flash als Standard, Fallback auf 1.5-flash
-    const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+    // Gemini Modell: gemini-2.5-flash (aktuelles Produktionsmodell)
+    const GEMINI_MODELS = ['gemini-2.5-flash'];
     let data = null;
     let lastError = null;
 
