@@ -390,4 +390,35 @@ router.put('/fishers/:id/unblock', async (req, res) => {
   }
 });
 
+// ── DELETE /api/admin/fishers/:id ─────────────────────────────
+// User komplett löschen (inkl. Fänge, Lizenzen, Notifications)
+router.delete('/fishers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Prüfen ob User existiert und kein Admin ist
+    const { rows } = await pool.query('SELECT id, role, first_name, last_name FROM users WHERE id = $1', [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Fischer nicht gefunden.' });
+    }
+    if (rows[0].role === 'admin') {
+      return res.status(403).json({ error: 'Admin-Accounts können nicht gelöscht werden.' });
+    }
+
+    const name = `${rows[0].first_name} ${rows[0].last_name}`;
+
+    // Abhängige Daten löschen (Reihenfolge beachten wg. Foreign Keys)
+    await pool.query('DELETE FROM catches WHERE user_id = $1', [id]);
+    await pool.query('DELETE FROM licenses WHERE user_id = $1', [id]);
+    await pool.query('DELETE FROM admin_notifications WHERE related_user_id = $1', [id]);
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+
+    console.log(`[Admin] User gelöscht: ${name} (ID: ${id})`);
+    res.json({ message: `Fischer "${name}" wurde gelöscht.` });
+  } catch (err) {
+    console.error('Delete fisher error:', err);
+    res.status(500).json({ error: 'Fehler beim Löschen: ' + err.message });
+  }
+});
+
 module.exports = router;

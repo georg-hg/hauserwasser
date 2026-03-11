@@ -73,6 +73,23 @@ export default function AdminDashboard() {
     }
   };
 
+  const deleteFisher = async (fisher) => {
+    const confirmed = confirm(
+      `Fischer "${fisher.lastName} ${fisher.firstName}" wirklich löschen?\n\n` +
+      `Dabei werden auch alle Fänge (${fisher.catchCount}), Lizenzen und Benachrichtigungen gelöscht.\n\n` +
+      `Diese Aktion kann nicht rückgängig gemacht werden!`
+    );
+    if (!confirmed) return;
+
+    try {
+      const result = await api.delete(`/api/admin/fishers/${fisher.id}`);
+      alert(result.message || 'Fischer gelöscht.');
+      loadFishers();
+    } catch (err) {
+      alert('Fehler: ' + err.message);
+    }
+  };
+
   const handleExport = async (fisherId = null) => {
     setExporting(true);
     try {
@@ -180,6 +197,7 @@ export default function AdminDashboard() {
           fishers={fishers}
           onToggleLicense={toggleLicense}
           onToggleBlock={toggleBlock}
+          onDeleteFisher={deleteFisher}
           onSelectFisher={setSelectedFisher}
           onExportFisher={(fisher) => handleExport(fisher.id)}
           currentYear={currentYear}

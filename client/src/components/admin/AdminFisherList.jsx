@@ -1,4 +1,4 @@
-export default function AdminFisherList({ fishers, onToggleLicense, onToggleBlock, onSelectFisher, onExportFisher, currentYear }) {
+export default function AdminFisherList({ fishers, onToggleLicense, onToggleBlock, onDeleteFisher, onSelectFisher, onExportFisher, currentYear }) {
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       {/* Desktop Table */}
@@ -83,6 +83,12 @@ export default function AdminFisherList({ fishers, onToggleLicense, onToggleBloc
                     >
                       Excel
                     </button>
+                    <button
+                      onClick={() => onDeleteFisher(f)}
+                      className="text-red-500 hover:text-red-700 text-xs font-medium"
+                    >
+                      Löschen
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -145,6 +151,9 @@ export default function AdminFisherList({ fishers, onToggleLicense, onToggleBloc
               </button>
               <button onClick={() => onExportFisher(f)} className="text-green-600 text-xs font-medium">
                 Excel
+              </button>
+              <button onClick={() => onDeleteFisher(f)} className="text-red-500 text-xs font-medium">
+                Löschen
               </button>
             </div>
           </div>
