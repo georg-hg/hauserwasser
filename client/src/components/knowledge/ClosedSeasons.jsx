@@ -77,6 +77,104 @@ const FISH_HABITAT = {
   },
 };
 
+/**
+ * Weitere Arten, die im Kremsabschnitt vorkommen, aber NICHT in der
+ * Fischereierlaubnis mit Schonzeiten/Mindestmaßen gelistet sind.
+ * Typische Begleitfauna der Unteren Forellenregion / Äschenregion.
+ */
+const ADDITIONAL_SPECIES = [
+  {
+    key: 'bullhead',
+    name: 'Koppe (Groppe)',
+    latin: 'Cottus gobio',
+    probability: 90,
+    label: 'Leitart',
+    habitat: 'Kühle, sauerstoffreiche Bäche mit steinigem Substrat, Verstecke unter Steinen und Totholz, saubere Gewässersohle.',
+    kremsNote: 'Die Koppe ist eine der häufigsten Kleinfischarten in der Krems. Sie lebt am Gewässergrund zwischen Steinen und ist ein wichtiger Indikator für gute Gewässerqualität. EU-weit geschützt (FFH-Richtlinie).',
+    status: 'FFH-geschützt',
+  },
+  {
+    key: 'stone_loach',
+    name: 'Bachschmerle',
+    latin: 'Barbatula barbatula',
+    probability: 80,
+    label: 'Häufig',
+    habitat: 'Sandige bis kiesige Gewässersohle, moderate Strömung, sauberes Interstitial (Lückensystem im Kies).',
+    kremsNote: 'Häufige Kleinfischart am Gewässergrund der Krems. Nachtaktiver Bodenfisch, der tagsüber unter Steinen lebt. Wichtig als Nahrung für Forellen.',
+    status: 'Begleitart',
+  },
+  {
+    key: 'minnow',
+    name: 'Elritze',
+    latin: 'Phoxinus phoxinus',
+    probability: 70,
+    label: 'Häufig',
+    habitat: 'Klare, kühle Fließgewässer mit kiesigem Grund, lebt in Schwärmen, braucht gute Wasserqualität und Sauerstoffgehalt.',
+    kremsNote: 'Typischer Schwarmfisch in der Krems, bevorzugt flache Rieselstrecken. Guter Bioindikator – ihr Vorkommen zeigt intakte Gewässerverhältnisse. Wichtige Futterfischart für Forellen.',
+    status: 'Begleitart',
+  },
+  {
+    key: 'nase',
+    name: 'Nase',
+    latin: 'Chondrostoma nasus',
+    probability: 25,
+    label: 'Selten',
+    habitat: 'Mittelgroße bis große Flüsse, kiesige Laichplätze mit stärkerer Strömung, Algenbewuchs als Nahrungsquelle, durchgängige Wanderstrecken.',
+    kremsNote: 'Die Nase benötigt Wandermöglichkeiten zum Laichen. Im Kremsabschnitt durch Querbauwerke eingeschränkt. Wichtige Art für die Gewässerökologie, Bestand rückläufig.',
+    status: 'Gefährdet (RL Ö)',
+  },
+  {
+    key: 'schneider',
+    name: 'Schneider',
+    latin: 'Alburnoides bipunctatus',
+    probability: 35,
+    label: 'Gelegentlich',
+    habitat: 'Klare, schnell fließende Gewässer mit Kiesgrund, lebt in kleinen Schwärmen nahe der Oberfläche, braucht sauberes Wasser.',
+    kremsNote: 'Typische Begleitart der Äschenregion. Guter Indikator für naturnahe Fließgewässer. In der Krems in geeigneten Abschnitten mit Kiesbänken anzutreffen.',
+    status: 'Gefährdet (RL Ö)',
+  },
+  {
+    key: 'gudgeon',
+    name: 'Gründling',
+    latin: 'Gobio gobio',
+    probability: 65,
+    label: 'Häufig',
+    habitat: 'Sand- und Kiesgrund, moderate Strömung, anpassungsfähig bei Wasserqualität, gräbt im Substrat nach Nahrung.',
+    kremsNote: 'Häufiger Bodenfisch in der Krems, besonders an sandigen Stellen und in ruhigeren Gleithängen der Mäander. Robust und anpassungsfähig.',
+    status: 'Begleitart',
+  },
+  {
+    key: 'dace',
+    name: 'Hasel',
+    latin: 'Leuciscus leuciscus',
+    probability: 30,
+    label: 'Gelegentlich',
+    habitat: 'Kühle bis mäßig warme Fließgewässer, kiesiger Grund, moderate Strömung, lebt in kleinen Gruppen.',
+    kremsNote: 'In der Krems vor allem im Übergangsbereich zur Äschenregion. Verwandt mit dem Aitel, aber kleiner und empfindlicher gegenüber Gewässerbelastung.',
+    status: 'Begleitart',
+  },
+  {
+    key: 'burbot',
+    name: 'Aalrutte (Rutte)',
+    latin: 'Lota lota',
+    probability: 15,
+    label: 'Sehr selten',
+    habitat: 'Kalte, sauerstoffreiche Gewässer, tiefere Bereiche und Kolke, steinig-kiesiger Grund, nachtaktiver Winterlaicher.',
+    kremsNote: 'Einziger Süßwasser-Dorsch Europas. In der Krems nur noch selten, bevorzugt tiefe Kolke. Laicht im Winter (Dez–Feb) und braucht kaltes Wasser. Bestand stark rückläufig.',
+    status: 'Gefährdet (RL Ö)',
+  },
+  {
+    key: 'stromer',
+    name: 'Strömer',
+    latin: 'Telestes souffia',
+    probability: 20,
+    label: 'Selten',
+    habitat: 'Schnell fließende, klare Gewässer mit grobem Kies, sauerstoffreich, typisch für die Äschenregion.',
+    kremsNote: 'Seltene Art, die in naturnahen Abschnitten der Krems vorkommen kann. Empfindlich gegenüber Verbauung und Sedimenteintrag. EU-weit geschützt.',
+    status: 'FFH-geschützt',
+  },
+];
+
 const PROBABILITY_COLORS = {
   high: { bar: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
   medium: { bar: 'bg-yellow-500', bg: 'bg-yellow-50', text: 'text-yellow-700' },
@@ -277,6 +375,126 @@ export default function ClosedSeasons() {
         <p className="text-sm text-red-700 font-medium">
           Huchen ist ganzjaehrig geschont und darf nicht entnommen werden!
         </p>
+      </div>
+
+      {/* Weitere Arten im Revier */}
+      <div className="mt-8">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Weitere Arten im Revier</h2>
+        <p className="text-sm text-gray-500 mb-3">
+          Begleitfauna im Kremsabschnitt Piberbach–Neuhofen (ohne Fangregulierung)
+        </p>
+
+        {/* Desktop-Tabelle */}
+        <div className="hidden md:block card p-0 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left p-3 font-semibold text-gray-700">Art</th>
+                <th className="text-center p-3 font-semibold text-gray-700">Vorkommen</th>
+                <th className="text-center p-3 font-semibold text-gray-700">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ADDITIONAL_SPECIES.map((art) => {
+                const isExpanded = expandedFish === art.key;
+                const color = getProbabilityColor(art.probability);
+
+                return (
+                  <tr key={art.key} className="border-b border-gray-100 last:border-0">
+                    <td className="p-3">
+                      <button
+                        onClick={() => toggleExpand(art.key)}
+                        className="text-left w-full"
+                      >
+                        <span className="font-medium">{art.name}</span>
+                        <span className="text-xs italic text-gray-400 ml-1.5">{art.latin}</span>
+                        <svg className={`inline-block w-3.5 h-3.5 ml-1 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {isExpanded && (
+                        <div className="mt-2 p-2.5 bg-blue-50 rounded-lg text-xs space-y-1.5 border border-blue-100">
+                          <p className="text-gray-700"><span className="font-semibold text-gray-800">Habitat:</span> {art.habitat}</p>
+                          <p className="text-blue-700"><span className="font-semibold text-blue-800">Krems:</span> {art.kremsNote}</p>
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() => toggleExpand(art.key)}
+                        className="inline-flex flex-col items-center gap-0.5 cursor-pointer"
+                        title={`${art.probability}% – ${art.label}`}
+                      >
+                        <span className={`text-xs font-bold ${color.text}`}>{art.probability}%</span>
+                        <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div className={`h-full ${color.bar} rounded-full`} style={{ width: `${art.probability}%` }} />
+                        </div>
+                        <span className="text-[10px] text-gray-400">{art.label}</span>
+                      </button>
+                    </td>
+                    <td className="p-3 text-center">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                        art.status.includes('FFH') ? 'bg-purple-100 text-purple-700' :
+                        art.status.includes('Gefährdet') ? 'bg-amber-100 text-amber-700' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {art.status}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile Karten */}
+        <div className="md:hidden space-y-2">
+          {ADDITIONAL_SPECIES.map((art) => {
+            const isExpanded = expandedFish === art.key;
+            const color = getProbabilityColor(art.probability);
+
+            return (
+              <div key={art.key} className="card p-3 border-l-4 border-l-gray-300">
+                <button
+                  onClick={() => toggleExpand(art.key)}
+                  className="w-full text-left"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-sm">{art.name}</span>
+                      <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      art.status.includes('FFH') ? 'bg-purple-100 text-purple-700' :
+                      art.status.includes('Gefährdet') ? 'bg-amber-100 text-amber-700' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>
+                      {art.status}
+                    </span>
+                  </div>
+                  <p className="text-xs italic text-gray-400 mt-0.5">{art.latin}</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className={`text-xs font-bold ${color.text} min-w-[32px]`}>{art.probability}%</span>
+                    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                      <div className={`h-full ${color.bar} rounded-full`} style={{ width: `${art.probability}%` }} />
+                    </div>
+                    <span className="text-[10px] text-gray-400 min-w-[60px] text-right">{art.label}</span>
+                  </div>
+                </button>
+
+                {isExpanded && (
+                  <div className="mt-2.5 p-2.5 bg-blue-50 rounded-lg text-xs space-y-1.5 border border-blue-100">
+                    <p className="text-gray-700"><span className="font-semibold text-gray-800">Habitat:</span> {art.habitat}</p>
+                    <p className="text-blue-700"><span className="font-semibold text-blue-800">Krems:</span> {art.kremsNote}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <p className="mt-4 text-xs text-gray-400">
