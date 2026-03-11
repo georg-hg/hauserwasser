@@ -76,7 +76,7 @@ export default function Navbar() {
           <div className="flex items-center gap-2">
             <Link
               to="/profil"
-              className="hidden sm:flex items-center gap-1.5 text-sm text-white/80 hover:text-white transition-colors group"
+              className="flex items-center gap-1.5 text-sm text-white/80 hover:text-white transition-colors group"
               title="Profil bearbeiten"
             >
               <svg className="w-5 h-5 text-white/60 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -85,7 +85,7 @@ export default function Navbar() {
               {user?.firstName}
             </Link>
 
-            <div className="w-px h-5 bg-white/20 hidden sm:block" />
+            <div className="w-px h-5 bg-white/20" />
 
             {/* Fischereiordnung */}
             <Link
