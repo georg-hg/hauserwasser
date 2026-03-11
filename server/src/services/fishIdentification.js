@@ -16,9 +16,7 @@ const SPECIES_MAP = {
 };
 
 // ── Google Vision Label → lokale Art ────────────────────────
-// Labels von Google Vision API (LABEL_DETECTION + WEB_DETECTION)
 const LABEL_MAPPING = [
-  // English + German labels
   { patterns: ['brown trout', 'bachforelle', 'salmo trutta', 'fario'],                  key: 'brown_trout',   german: 'Bachforelle',       latin: 'Salmo trutta fario' },
   { patterns: ['rainbow trout', 'regenbogenforelle', 'oncorhynchus mykiss', 'steelhead'], key: 'rainbow_trout', german: 'Regenbogenforelle', latin: 'Oncorhynchus mykiss' },
   { patterns: ['arctic char', 'brook char', 'brook trout', 'saibling', 'salvelinus', 'char'], key: 'char', german: 'Saibling', latin: 'Salvelinus fontinalis' },
@@ -32,7 +30,7 @@ const LABEL_MAPPING = [
   { patterns: ['huchen', 'danube salmon', 'hucho'],                                      key: 'huchen',        german: 'Huchen',            latin: 'Hucho hucho' },
 ];
 
-// Generische Fisch-Labels (zur Erkennung ob überhaupt ein Fisch im Bild ist)
+// Generische Fisch-Labels
 const FISH_INDICATORS = [
   'fish', 'trout', 'salmon', 'carp', 'pike', 'perch', 'bass',
   'fisch', 'forelle', 'lachs', 'hecht', 'barsch', 'karpfen',
@@ -44,7 +42,6 @@ const FISH_INDICATORS = [
  * Fisch erkennen – nutzt Google Cloud Vision API (LABEL_DETECTION + WEB_DETECTION)
  */
 async function identifyFish(imagePath) {
-  // Bevorzuge eigenen Vision-Key, falle auf Maps-Key zurück
   const apiKey = process.env.GOOGLE_VISION_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
 
   if (!apiKey) {
@@ -66,9 +63,10 @@ async function identifyFish(imagePath) {
 
     const base64Image = resizedBuffer.toString('base64');
 
+    // ── Schritt 1: Artenbestimmung via Google Cloud Vision ──
     console.log('[Fish-ID] Sending image to Google Cloud Vision API...');
 
-    const response = await fetch(
+    const visionResponse = await fetch(
       `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
       {
         method: 'POST',
@@ -86,86 +84,56 @@ async function identifyFish(imagePath) {
       }
     );
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      console.error('[Fish-ID] Google Vision API Error – Status:', response.status);
+    if (!visionResponse.ok) {
+      const errorText = await visionResponse.text().catch(() => '');
+      console.error('[Fish-ID] Google Vision API Error – Status:', visionResponse.status);
       console.error('[Fish-ID] Response:', errorText.substring(0, 500));
 
-      // Spezifische Fehler erkennen
-      if (response.status === 403) {
+      if (visionResponse.status === 403) {
         if (errorText.includes('Cloud Vision API has not been used') || errorText.includes('is not enabled')) {
-          console.error('[Fish-ID] → Cloud Vision API ist nicht aktiviert!');
-          console.error('[Fish-ID] → Bitte unter https://console.cloud.google.com/apis/library/vision.googleapis.com aktivieren');
-          return fallbackResult(
-            'Die Cloud Vision API ist nicht aktiviert. Bitte in der Google Cloud Console unter "APIs & Dienste" die "Cloud Vision API" aktivieren.'
-          );
+          return fallbackResult('Die Cloud Vision API ist nicht aktiviert. Bitte in der Google Cloud Console aktivieren.');
         }
         if (errorText.includes('API key not valid') || errorText.includes('API_KEY_INVALID')) {
           return fallbackResult('Der API-Schlüssel ist ungültig oder hat keine Berechtigung für die Vision API.');
         }
         if (errorText.includes('PERMISSION_DENIED') || errorText.includes('API key is not authorized')) {
-          return fallbackResult(
-            'Der API-Schlüssel hat keine Berechtigung für die Cloud Vision API. Bitte die API-Key-Einschränkungen in der Google Cloud Console prüfen.'
-          );
+          return fallbackResult('Der API-Schlüssel hat keine Berechtigung für die Cloud Vision API.');
         }
-        return fallbackResult('Zugriff auf die Bildanalyse verweigert (403). Bitte API-Key-Berechtigungen prüfen.');
+        return fallbackResult('Zugriff auf die Bildanalyse verweigert (403).');
       }
-
-      if (response.status === 429) {
-        return fallbackResult('Zu viele Anfragen – bitte in einer Minute erneut versuchen.');
-      }
-
-      if (response.status === 400) {
-        return fallbackResult('Bildanalyse fehlgeschlagen – ungültiges Bild oder Anfrage.');
-      }
-
-      return fallbackResult(`Bildanalyse-Service nicht verfügbar (HTTP ${response.status}).`);
+      if (visionResponse.status === 429) return fallbackResult('Zu viele Anfragen – bitte in einer Minute erneut versuchen.');
+      if (visionResponse.status === 400) return fallbackResult('Bildanalyse fehlgeschlagen – ungültiges Bild.');
+      return fallbackResult(`Bildanalyse-Service nicht verfügbar (HTTP ${visionResponse.status}).`);
     }
 
-    const data = await response.json();
+    const data = await visionResponse.json();
     const result = data.responses?.[0];
 
     if (!result) {
       return fallbackResult('Keine Analyseergebnisse erhalten.');
     }
 
-    // Alle Labels sammeln (LABEL_DETECTION + WEB_DETECTION)
+    // Labels sammeln
     const allLabels = [];
 
-    // Standard-Labels
     if (result.labelAnnotations) {
       for (const label of result.labelAnnotations) {
-        allLabels.push({
-          description: label.description.toLowerCase(),
-          score: label.score || 0,
-          source: 'label',
-        });
+        allLabels.push({ description: label.description.toLowerCase(), score: label.score || 0, source: 'label' });
       }
     }
-
-    // Web-Detection Labels (oft spezifischer für Tierarten)
     if (result.webDetection) {
       const wd = result.webDetection;
       if (wd.webEntities) {
         for (const entity of wd.webEntities) {
           if (entity.description) {
-            allLabels.push({
-              description: entity.description.toLowerCase(),
-              score: entity.score || 0,
-              source: 'web',
-            });
+            allLabels.push({ description: entity.description.toLowerCase(), score: entity.score || 0, source: 'web' });
           }
         }
       }
-      // Best guess labels
       if (wd.bestGuessLabels) {
         for (const bgl of wd.bestGuessLabels) {
           if (bgl.label) {
-            allLabels.push({
-              description: bgl.label.toLowerCase(),
-              score: 0.9,
-              source: 'bestGuess',
-            });
+            allLabels.push({ description: bgl.label.toLowerCase(), score: 0.9, source: 'bestGuess' });
           }
         }
       }
@@ -173,17 +141,14 @@ async function identifyFish(imagePath) {
 
     console.log('[Fish-ID] All labels:', allLabels.map(l => `${l.description} (${l.score.toFixed(2)}, ${l.source})`).join(', '));
 
-    // Prüfen ob überhaupt ein Fisch erkannt wurde
-    const isFish = allLabels.some(l =>
-      FISH_INDICATORS.some(fi => l.description.includes(fi))
-    );
+    // Prüfen ob Fisch im Bild
+    const isFish = allLabels.some(l => FISH_INDICATORS.some(fi => l.description.includes(fi)));
 
     if (!isFish) {
-      console.log('[Fish-ID] No fish detected in image');
       return fallbackResult('Kein Fisch im Bild erkannt. Bitte ein deutliches Foto des Fisches aufnehmen.');
     }
 
-    // Spezifische Art bestimmen
+    // Art bestimmen
     const speciesMatches = [];
     for (const mapping of LABEL_MAPPING) {
       let bestScore = 0;
@@ -191,25 +156,27 @@ async function identifyFish(imagePath) {
       for (const pattern of mapping.patterns) {
         for (const label of allLabels) {
           if (label.description.includes(pattern)) {
-            const score = label.score > bestScore ? label.score : bestScore;
-            if (score > bestScore) {
-              bestScore = score;
+            if (label.score > bestScore) {
+              bestScore = label.score;
               matchedPattern = pattern;
             }
           }
         }
       }
       if (bestScore > 0) {
-        speciesMatches.push({
-          ...mapping,
-          score: bestScore,
-          matchedPattern,
-        });
+        speciesMatches.push({ ...mapping, score: bestScore, matchedPattern });
       }
     }
-
-    // Sortieren nach Score
     speciesMatches.sort((a, b) => b.score - a.score);
+
+    // ── Schritt 2: Längenschätzung via Gemini Vision ──
+    let estimatedLength = null;
+    try {
+      estimatedLength = await estimateFishLength(base64Image, speciesMatches[0]?.german);
+      console.log('[Fish-ID] Geschätzte Länge:', estimatedLength);
+    } catch (err) {
+      console.warn('[Fish-ID] Längenschätzung fehlgeschlagen:', err.message);
+    }
 
     if (speciesMatches.length > 0) {
       const top = speciesMatches[0];
@@ -220,6 +187,7 @@ async function identifyFish(imagePath) {
         speciesGerman: top.german,
         speciesLatin: top.latin,
         confidence: Math.round(top.score * 100) / 100,
+        estimatedLength,
         allResults: speciesMatches.slice(0, 5).map(m => ({
           name: m.latin,
           commonName: m.german,
@@ -229,13 +197,13 @@ async function identifyFish(imagePath) {
       };
     }
 
-    // Fisch erkannt, aber nicht in unserer Artenliste
-    console.log('[Fish-ID] Fish detected but species not in local mapping');
+    // Fisch erkannt, aber Art unbekannt
     return {
       species: 'unknown',
       speciesGerman: 'Nicht erkannt',
       speciesLatin: '',
       confidence: 0,
+      estimatedLength,
       allResults: [],
       note: 'Fisch erkannt, aber Art konnte nicht zugeordnet werden. Bitte manuell auswählen.',
     };
@@ -252,6 +220,113 @@ async function identifyFish(imagePath) {
 }
 
 /**
+ * Fischlänge schätzen via Google Gemini Vision API
+ * Analysiert das Bild und schätzt die Länge anhand visueller Hinweise
+ * (Hände, Untergrund, Proportionen, Netz, etc.)
+ */
+async function estimateFishLength(base64Image, speciesName) {
+  const geminiKey = process.env.GEMINI_API_KEY
+    || process.env.GOOGLE_VISION_API_KEY
+    || process.env.GOOGLE_MAPS_API_KEY;
+
+  if (!geminiKey) {
+    console.warn('[Fish-Length] Kein API-Key für Gemini');
+    return null;
+  }
+
+  const prompt = `Du bist ein Experte für Süßwasserfische in Oberösterreich. Analysiere dieses Foto eines Fisches und schätze die Gesamtlänge (Kopf bis Schwanzflosse) in Zentimetern.
+
+${speciesName ? `Die Art wurde als "${speciesName}" identifiziert.` : ''}
+
+Nutze folgende Hinweise im Bild zur Größenschätzung:
+- Hände/Finger des Anglers (Handbreite ≈ 8-10 cm, Fingerbreite ≈ 2 cm)
+- Kescher/Netz (typische Öffnung 40-50 cm)
+- Untergrund-Textur (Gras, Steine, Holz)
+- Proportionen des Fischkörpers relativ zur Umgebung
+- Angelrute oder andere Ausrüstung im Bild
+
+WICHTIG: Antworte NUR mit einem JSON-Objekt in diesem Format, kein anderer Text:
+{"lengthCm": <Zahl>, "confidence": "<niedrig|mittel|hoch>", "hint": "<kurze Begründung auf Deutsch>"}
+
+Beispiel: {"lengthCm": 35, "confidence": "mittel", "hint": "Geschätzt anhand der Handgröße des Anglers"}
+
+Falls du die Länge nicht einschätzen kannst, antworte: {"lengthCm": null, "confidence": "niedrig", "hint": "Keine Referenzobjekte im Bild erkennbar"}`;
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              {
+                inline_data: {
+                  mime_type: 'image/jpeg',
+                  data: base64Image,
+                },
+              },
+            ],
+          }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 200,
+          },
+        }),
+        signal: AbortSignal.timeout(20000),
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      console.warn('[Fish-Length] Gemini API Error:', response.status, errText.substring(0, 200));
+      return null;
+    }
+
+    const geminiData = await response.json();
+    const textContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    console.log('[Fish-Length] Gemini raw response:', textContent);
+
+    // JSON aus Antwort extrahieren
+    const jsonMatch = textContent.match(/\{[\s\S]*?\}/);
+    if (!jsonMatch) {
+      console.warn('[Fish-Length] Kein JSON in Gemini-Antwort gefunden');
+      return null;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    if (parsed.lengthCm === null || parsed.lengthCm === undefined) {
+      return {
+        lengthCm: null,
+        confidence: 'niedrig',
+        hint: parsed.hint || 'Länge konnte nicht geschätzt werden.',
+        source: 'ai',
+      };
+    }
+
+    const lengthCm = Math.round(Number(parsed.lengthCm));
+    if (isNaN(lengthCm) || lengthCm < 3 || lengthCm > 200) {
+      console.warn('[Fish-Length] Unplausible Länge:', parsed.lengthCm);
+      return null;
+    }
+
+    return {
+      lengthCm,
+      confidence: parsed.confidence || 'mittel',
+      hint: parsed.hint || 'KI-Schätzung',
+      source: 'ai',
+    };
+  } catch (err) {
+    console.warn('[Fish-Length] Fehler:', err.message);
+    return null;
+  }
+}
+
+/**
  * Fallback wenn API nicht verfügbar
  */
 function fallbackResult(reason) {
@@ -260,6 +335,7 @@ function fallbackResult(reason) {
     speciesGerman: 'Nicht erkannt',
     speciesLatin: '',
     confidence: 0,
+    estimatedLength: null,
     allResults: [],
     note: reason || 'Automatische Erkennung nicht verfügbar – bitte Fischart manuell auswählen.',
   };

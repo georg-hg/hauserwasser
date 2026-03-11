@@ -31,6 +31,8 @@ services:
         value: AIzaSyCkV_EsHvBIrKGjBPYMrKr1ej7DHoHDIKg
       - key: GOOGLE_VISION_API_KEY
         value: AIzaSyD92m-spIs7D6KmzTST4DaJhF9KByuUn-0
+      - key: GEMINI_API_KEY
+        value: AIzaSyBty-AJoxn_-ds-37BhzLg0UK3lhTsTTQ8
       - key: CORS_ORIGIN
         value: https://hauserwasser-client.onrender.com
 
