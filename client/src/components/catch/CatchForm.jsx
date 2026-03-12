@@ -144,7 +144,7 @@ export default function CatchForm() {
             <input type="number" step="0.1" min="0" value={form.lengthCm} onChange={update('lengthCm')} className="input-field" placeholder="z.B. 32.5" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Gewicht (kg)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Gewicht in kg (optional)</label>
             <input type="number" step="0.01" min="0" value={form.weightKg} onChange={update('weightKg')} className="input-field" placeholder="z.B. 0.45" />
           </div>
         </div>
@@ -194,7 +194,7 @@ export default function CatchForm() {
         {/* Notizen */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Notizen</label>
-          <textarea value={form.notes} onChange={update('notes')} rows={2} className="input-field" placeholder="Optional..." />
+          <textarea value={form.notes} onChange={update('notes')} rows={2} className="input-field" placeholder="Wildfang oder Eingesetzt?" />
         </div>
 
         {/* Submit */}
