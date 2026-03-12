@@ -99,6 +99,7 @@ router.post('/login', async (req, res) => {
         firstName: user.first_name,
         lastName: user.last_name,
         role: user.role,
+        fisherCardUrl: user.fisher_card_url || null,
       },
     });
   } catch (err) {

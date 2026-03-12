@@ -52,8 +52,14 @@ export default function App() {
           <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
           <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
 
-          {/* App */}
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          {/* App — Fischer ohne Karte → Profil */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              {user && user.role !== 'admin' && !user.fisherCardUrl
+                ? <Navigate to="/profil" />
+                : <Dashboard />}
+            </ProtectedRoute>
+          } />
           <Route path="/fang/neu" element={<ProtectedRoute><CatchForm /></ProtectedRoute>} />
           <Route path="/fangbuch" element={<ProtectedRoute><CatchList /></ProtectedRoute>} />
           <Route path="/erkennung" element={<ProtectedRoute><ImageUpload /></ProtectedRoute>} />
