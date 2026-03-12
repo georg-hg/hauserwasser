@@ -1,4 +1,4 @@
-export default function AdminFisherList({ fishers, onToggleLicense, onSelectFisher, onExportFisher, currentYear }) {
+export default function AdminFisherList({ fishers, onToggleLicense, onToggleBlock, onDeleteFisher, onSelectFisher, onExportFisher, currentYear }) {
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       {/* Desktop Table */}
@@ -10,15 +10,25 @@ export default function AdminFisherList({ fishers, onToggleLicense, onSelectFish
               <th className="text-left px-4 py-3 font-medium text-gray-600">E-Mail</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Karten-Nr.</th>
               <th className="text-center px-4 py-3 font-medium text-gray-600">Fänge {currentYear}</th>
-              <th className="text-center px-4 py-3 font-medium text-gray-600">Lizenz {currentYear}</th>
+              <th className="text-center px-4 py-3 font-medium text-gray-600">Lizenz</th>
+              <th className="text-center px-4 py-3 font-medium text-gray-600">Status</th>
               <th className="text-right px-4 py-3 font-medium text-gray-600">Aktionen</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {fishers.map((f) => (
-              <tr key={f.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 font-medium text-gray-900">
-                  {f.lastName} {f.firstName}
+              <tr key={f.id} className={`hover:bg-gray-50 transition-colors ${f.blocked ? 'bg-red-50/50' : ''}`}>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    {f.blocked && (
+                      <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span className={`font-medium ${f.blocked ? 'text-red-700 line-through' : 'text-gray-900'}`}>
+                      {f.lastName} {f.firstName}
+                    </span>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-gray-600">{f.email}</td>
                 <td className="px-4 py-3 text-gray-600">{f.fisherCardNr || '—'}</td>
@@ -43,14 +53,20 @@ export default function AdminFisherList({ fishers, onToggleLicense, onSelectFish
                         </svg>
                         Aktiv
                       </>
-                    ) : (
-                      <>
-                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                        Nicht freigeschaltet
-                      </>
-                    )}
+                    ) : 'Nicht freigeschaltet'}
+                  </button>
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <button
+                    onClick={() => onToggleBlock(f.id, f.blocked)}
+                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      f.blocked
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                    title={f.blockedReason || ''}
+                  >
+                    {f.blocked ? 'Gesperrt' : 'Aktiv'}
                   </button>
                 </td>
                 <td className="px-4 py-3 text-right">
@@ -67,6 +83,12 @@ export default function AdminFisherList({ fishers, onToggleLicense, onSelectFish
                     >
                       Excel
                     </button>
+                    <button
+                      onClick={() => onDeleteFisher(f)}
+                      className="text-red-500 hover:text-red-700 text-xs font-medium"
+                    >
+                      Löschen
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -78,18 +100,28 @@ export default function AdminFisherList({ fishers, onToggleLicense, onSelectFish
       {/* Mobile Cards */}
       <div className="md:hidden divide-y divide-gray-100">
         {fishers.map((f) => (
-          <div key={f.id} className="p-4 space-y-3">
+          <div key={f.id} className={`p-4 space-y-3 ${f.blocked ? 'bg-red-50/50' : ''}`}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-medium text-gray-900">{f.lastName} {f.firstName}</p>
+                <div className="flex items-center gap-1.5">
+                  {f.blocked && (
+                    <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                  <p className={`font-medium ${f.blocked ? 'text-red-700 line-through' : 'text-gray-900'}`}>
+                    {f.lastName} {f.firstName}
+                  </p>
+                </div>
                 <p className="text-xs text-gray-500">{f.email}</p>
+                {f.fisherCardNr && <p className="text-xs text-gray-400">Nr. {f.fisherCardNr}</p>}
               </div>
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                 {f.catchCount} Fänge
               </span>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => onToggleLicense(f.id, !!f.license)}
                 className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -101,14 +133,28 @@ export default function AdminFisherList({ fishers, onToggleLicense, onSelectFish
                 {f.license ? 'Lizenz aktiv' : 'Nicht freigeschaltet'}
               </button>
 
-              <div className="flex gap-3">
-                <button onClick={() => onSelectFisher(f)} className="text-primary-600 text-xs font-medium">
-                  Fangbuch
-                </button>
-                <button onClick={() => onExportFisher(f)} className="text-green-600 text-xs font-medium">
-                  Excel
-                </button>
-              </div>
+              <button
+                onClick={() => onToggleBlock(f.id, f.blocked)}
+                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  f.blocked
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {f.blocked ? 'Entsperren' : 'Sperren'}
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button onClick={() => onSelectFisher(f)} className="text-primary-600 text-xs font-medium">
+                Fangbuch
+              </button>
+              <button onClick={() => onExportFisher(f)} className="text-green-600 text-xs font-medium">
+                Excel
+              </button>
+              <button onClick={() => onDeleteFisher(f)} className="text-red-500 text-xs font-medium">
+                Löschen
+              </button>
             </div>
           </div>
         ))}

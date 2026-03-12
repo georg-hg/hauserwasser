@@ -1,9 +1,131 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { api } from '../../api/client';
 
 const API_URL = import.meta.env.VITE_API_URL ? `https://${import.meta.env.VITE_API_URL}` : '';
+
+function AppInstallSection() {
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [installed, setInstalled] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+
+  useEffect(() => {
+    // Already installed?
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+      setInstalled(true);
+      return;
+    }
+
+    const ua = window.navigator.userAgent.toLowerCase();
+    setIsIos(/iphone|ipad|ipod/.test(ua) && !window.MSStream);
+
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = useCallback(async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') setInstalled(true);
+    setDeferredPrompt(null);
+  }, [deferredPrompt]);
+
+  if (installed) {
+    return (
+      <section className="bg-white rounded-xl shadow-sm p-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+            <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900">App installiert</p>
+            <p className="text-sm text-gray-500">Hauserwasser laeuft als App auf deinem Geraet.</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // iOS: show manual steps
+  if (isIos) {
+    return (
+      <section className="bg-white rounded-xl shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-3">App installieren</h2>
+        <div className="flex items-center gap-4 mb-3">
+          <img src="/icons/icon-96x96.png" alt="" className="w-14 h-14 rounded-2xl shadow" />
+          <div>
+            <p className="font-semibold text-gray-900">Hauserwasser</p>
+            <p className="text-sm text-gray-500">Zum Homescreen hinzufuegen</p>
+          </div>
+        </div>
+        <div className="space-y-2 mb-4">
+          <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+            <span className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">1</span>
+            <p className="text-sm text-gray-800">
+              Tippe auf{' '}
+              <svg className="inline w-5 h-5 text-blue-600 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              {' '}<strong>Teilen</strong> (Safari-Leiste unten)
+            </p>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+            <span className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">2</span>
+            <p className="text-sm text-gray-800">
+              Waehle{' '}
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-white rounded border border-gray-200 text-xs font-medium">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Zum Home-Bildschirm
+              </span>
+            </p>
+          </div>
+        </div>
+        <p className="text-xs text-gray-400">Die App funktioniert dann wie eine native App mit eigenem Icon.</p>
+      </section>
+    );
+  }
+
+  // Android/Desktop: install button
+  return (
+    <section className="bg-white rounded-xl shadow-sm p-6">
+      <h2 className="text-lg font-semibold text-gray-800 mb-3">App installieren</h2>
+      <div className="flex items-center gap-4 mb-4">
+        <img src="/icons/icon-96x96.png" alt="" className="w-14 h-14 rounded-2xl shadow" />
+        <div className="flex-1">
+          <p className="font-semibold text-gray-900">Hauserwasser</p>
+          <p className="text-sm text-gray-500">Fangbuch am Homescreen – schneller Zugriff, auch offline.</p>
+        </div>
+      </div>
+      {deferredPrompt ? (
+        <button
+          onClick={handleInstall}
+          className="w-full py-3.5 text-base font-bold text-white bg-primary-600 rounded-xl active:bg-primary-700 transition-colors shadow-lg shadow-primary-600/20"
+        >
+          Jetzt installieren
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-sm text-gray-600">
+            Oeffne diese Seite im <strong>Chrome-Browser</strong> und tippe dann hier auf &quot;Installieren&quot;.
+          </p>
+          <p className="text-xs text-gray-400">
+            Falls du Chrome nutzt: tippe auf das Menue (drei Punkte oben rechts) und waehle &quot;App installieren&quot; oder &quot;Zum Startbildschirm hinzufuegen&quot;.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
@@ -322,6 +444,9 @@ export default function Profile() {
           </Link>
         </div>
       </section>
+
+      {/* App installieren */}
+      <AppInstallSection />
 
       {/* Passwort ändern */}
       <section className="bg-white rounded-xl shadow-sm p-6">

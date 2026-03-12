@@ -13,7 +13,10 @@ const REVIER = {
     label: 'Obergrenze (ehem. Lindlmair-Infang)',
   },
   untergrenze: {
-    position: { lat: 48.13057441233753, lng: 14.225871043583517 },
+    // Zwei Punkte an den gegenueberliegenden Ufern fuer Linie ueber den Fluss
+    uferLinks:  { lat: 48.13042, lng: 14.22545 },
+    uferRechts: { lat: 48.13072, lng: 14.22630 },
+    center:     { lat: 48.13057, lng: 14.22588 },
     label: 'Untergrenze (50m ob. Obermuehlwehr)',
     flussKm: 17.070,
     regKm: 13.472,
@@ -26,7 +29,7 @@ const containerStyle = { width: '100%', height: '100%' };
 
 const mapOptions = {
   mapTypeId: 'satellite',
-  mapTypeControl: true,
+  mapTypeControl: false,
   zoomControl: true,
   streetViewControl: false,
   fullscreenControl: true,
@@ -82,14 +85,9 @@ export default function MapComponent({
       icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#EF4444', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 14 },
     });
 
-    // Untergrenze – rote Linie quer über den Fluss (analog zu OG)
-    const ugPos = REVIER.untergrenze.position;
-    const ugOffset = 0.00025; // ca. 25m Querversatz für Flusslinie
-    const ugPoint1 = { lat: ugPos.lat - ugOffset * 0.3, lng: ugPos.lng - ugOffset };
-    const ugPoint2 = { lat: ugPos.lat + ugOffset * 0.3, lng: ugPos.lng + ugOffset };
-
+    // Untergrenze – rote Linie von Ufer zu Ufer
     new google.maps.Polyline({
-      path: [ugPoint1, ugPoint2],
+      path: [REVIER.untergrenze.uferLinks, REVIER.untergrenze.uferRechts],
       strokeColor: '#EF4444',
       strokeOpacity: 0.9,
       strokeWeight: 4,
@@ -97,7 +95,7 @@ export default function MapComponent({
     });
 
     new google.maps.Marker({
-      position: ugPos, map: mapInstance,
+      position: REVIER.untergrenze.center, map: mapInstance,
       label: { text: 'UG', color: '#fff', fontWeight: 'bold', fontSize: '11px' },
       title: REVIER.untergrenze.label,
       icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: '#EF4444', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2, scale: 14 },
@@ -122,6 +120,15 @@ export default function MapComponent({
       (err) => console.error('GPS-Fehler:', err),
       { enableHighAccuracy: true, timeout: 10000 }
     );
+  };
+
+  const handleZoomToRevier = () => {
+    if (!mapRef.current) return;
+    const bounds = new google.maps.LatLngBounds(
+      { lat: REVIER.bounds.south, lng: REVIER.bounds.west },
+      { lat: REVIER.bounds.north, lng: REVIER.bounds.east }
+    );
+    mapRef.current.fitBounds(bounds);
   };
 
   if (loadError) {
@@ -197,10 +204,20 @@ export default function MapComponent({
         ))}
       </GoogleMap>
 
-      {/* GPS-Button */}
+      {/* Hauserwasser – prominent rechts oben */}
+      <button
+        onClick={handleZoomToRevier}
+        className="absolute top-3 right-3 z-10 bg-primary-700 hover:bg-primary-800 active:bg-primary-900 text-white px-4 py-2.5 rounded-lg shadow-xl transition-colors flex items-center gap-2"
+        title="Zum Hauserwasser zoomen"
+      >
+        <img src="/icons/icon-96x96.png" alt="" className="w-6 h-6 rounded-full" />
+        <span className="text-sm font-bold tracking-wide">Hauserwasser</span>
+      </button>
+
+      {/* GPS-Button rechts unten */}
       <button
         onClick={handleGPS}
-        className="absolute bottom-4 right-4 bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 active:bg-gray-100 transition-colors z-10"
+        className="absolute bottom-4 right-4 z-10 bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
         title="Meinen Standort verwenden"
       >
         <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

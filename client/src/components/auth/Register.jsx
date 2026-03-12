@@ -30,6 +30,7 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gradient-to-br from-primary-700 to-primary-900">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
+          <img src="/icons/icon-192x192.png" alt="Hauserwasser" className="w-24 h-24 mx-auto mb-3 rounded-full shadow-lg" />
           <h1 className="text-3xl font-bold text-white">Hauserwasser</h1>
           <p className="text-primary-200 mt-1">Konto erstellen</p>
         </div>

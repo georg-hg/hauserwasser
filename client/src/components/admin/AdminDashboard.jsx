@@ -1,13 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../api/client';
 import AdminFisherList from './AdminFisherList';
 import AdminCatchView from './AdminCatchView';
+import AdminInbox from './AdminInbox';
+
+const TABS = [
+  { id: 'fischkarten', label: 'Fischkarten', icon: 'M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z' },
+  { id: 'inbox', label: 'Inbox', icon: 'M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661z' },
+];
 
 export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState('fischkarten');
   const [fishers, setFishers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFisher, setSelectedFisher] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const currentYear = new Date().getFullYear();
 
   const loadFishers = async () => {
@@ -21,7 +29,22 @@ export default function AdminDashboard() {
     }
   };
 
-  useEffect(() => { loadFishers(); }, []);
+  const loadUnreadCount = useCallback(async () => {
+    try {
+      const data = await api.get('/api/admin/notifications/unread-count');
+      setUnreadCount(data.count);
+    } catch (err) {
+      console.error('Unread count error:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFishers();
+    loadUnreadCount();
+    // Alle 30 Sekunden auf neue Notifications prüfen
+    const interval = setInterval(loadUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [loadUnreadCount]);
 
   const toggleLicense = async (fisherId, hasLicense) => {
     try {
@@ -33,6 +56,37 @@ export default function AdminDashboard() {
       loadFishers();
     } catch (err) {
       alert(err.message);
+    }
+  };
+
+  const toggleBlock = async (fisherId, isBlocked) => {
+    try {
+      if (isBlocked) {
+        await api.put(`/api/admin/fishers/${fisherId}/unblock`);
+      } else {
+        const reason = prompt('Sperrgrund (optional):');
+        await api.put(`/api/admin/fishers/${fisherId}/block`, { reason });
+      }
+      loadFishers();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const deleteFisher = async (fisher) => {
+    const confirmed = confirm(
+      `Fischer "${fisher.lastName} ${fisher.firstName}" wirklich löschen?\n\n` +
+      `Dabei werden auch alle Fänge (${fisher.catchCount}), Lizenzen und Benachrichtigungen gelöscht.\n\n` +
+      `Diese Aktion kann nicht rückgängig gemacht werden!`
+    );
+    if (!confirmed) return;
+
+    try {
+      const result = await api.delete(`/api/admin/fishers/${fisher.id}`);
+      alert(result.message || 'Fischer gelöscht.');
+      loadFishers();
+    } catch (err) {
+      alert('Fehler: ' + err.message);
     }
   };
 
@@ -89,6 +143,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Admin-Bereich</h1>
@@ -96,26 +151,62 @@ export default function AdminDashboard() {
             Saison {currentYear} &middot; {fishers.length} registrierte Fischer
           </p>
         </div>
-        <button
-          onClick={() => handleExport()}
-          disabled={exporting}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg
-                     hover:bg-green-700 disabled:opacity-50 transition-colors text-sm font-medium"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          {exporting ? 'Exportiere...' : 'Alle Fangbücher exportieren (Excel)'}
-        </button>
+        {activeTab === 'fischkarten' && (
+          <button
+            onClick={() => handleExport()}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg
+                       hover:bg-green-700 disabled:opacity-50 transition-colors text-sm font-medium"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            {exporting ? 'Exportiere...' : 'Excel-Export'}
+          </button>
+        )}
       </div>
 
-      <AdminFisherList
-        fishers={fishers}
-        onToggleLicense={toggleLicense}
-        onSelectFisher={setSelectedFisher}
-        onExportFisher={(fisher) => handleExport(fisher.id)}
-        currentYear={currentYear}
-      />
+      {/* Tab-Navigation */}
+      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              activeTab === tab.id
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d={tab.icon} />
+            </svg>
+            {tab.label}
+            {tab.id === 'inbox' && unreadCount > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold bg-red-500 text-white">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab-Content */}
+      {activeTab === 'fischkarten' && (
+        <AdminFisherList
+          fishers={fishers}
+          onToggleLicense={toggleLicense}
+          onToggleBlock={toggleBlock}
+          onDeleteFisher={deleteFisher}
+          onSelectFisher={setSelectedFisher}
+          onExportFisher={(fisher) => handleExport(fisher.id)}
+          currentYear={currentYear}
+        />
+      )}
+
+      {activeTab === 'inbox' && (
+        <AdminInbox onUnreadChange={setUnreadCount} />
+      )}
     </div>
   );
 }
