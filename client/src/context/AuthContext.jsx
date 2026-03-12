@@ -33,13 +33,22 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
+  const refreshUser = async () => {
+    try {
+      const data = await api.get('/api/auth/me');
+      setUser(data);
+    } catch (err) {
+      console.error('Refresh user error:', err);
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('hw_token');
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

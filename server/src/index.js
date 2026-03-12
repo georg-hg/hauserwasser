@@ -57,6 +57,9 @@ async function start() {
   try {
     const { rows } = await pool.query('SELECT NOW()');
     console.log('✓ PostgreSQL verbunden:', rows[0].now);
+
+    // Auto-Migrate: Fischerkarte Wallet Spalte
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS fisher_card_url TEXT').catch(() => {});
     app.listen(PORT, () => {
       console.log(`✓ Hauserwasser API läuft auf Port ${PORT}`);
     });

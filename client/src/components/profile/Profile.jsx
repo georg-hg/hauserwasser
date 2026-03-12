@@ -1,12 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { api } from '../../api/client';
 
+const API_URL = import.meta.env.VITE_API_URL ? `https://${import.meta.env.VITE_API_URL}` : '';
+
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [licenses, setLicenses] = useState([]);
   const [loadingLicenses, setLoadingLicenses] = useState(true);
+
+  // Fischerkarte Wallet
+  const [cardUrl, setCardUrl] = useState(null);
+  const [cardUploading, setCardUploading] = useState(false);
+  const [cardFullscreen, setCardFullscreen] = useState(false);
+  const cardInputRef = useRef(null);
 
   // Passwort-Form
   const [currentPw, setCurrentPw] = useState('');
@@ -24,6 +32,40 @@ export default function Profile() {
       .catch(console.error)
       .finally(() => setLoadingLicenses(false));
   }, []);
+
+  // Fischerkarte aus User-Daten laden
+  useEffect(() => {
+    if (user?.fisherCardUrl) setCardUrl(user.fisherCardUrl);
+  }, [user]);
+
+  const handleCardUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCardUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('card', file);
+      const data = await api.upload('/api/auth/fisher-card', formData);
+      setCardUrl(data.fisherCardUrl);
+      if (refreshUser) refreshUser();
+    } catch (err) {
+      alert('Upload fehlgeschlagen: ' + err.message);
+    } finally {
+      setCardUploading(false);
+      if (cardInputRef.current) cardInputRef.current.value = '';
+    }
+  };
+
+  const handleCardDelete = async () => {
+    if (!confirm('Fischerkarte wirklich entfernen?')) return;
+    try {
+      await api.delete('/api/auth/fisher-card');
+      setCardUrl(null);
+      if (refreshUser) refreshUser();
+    } catch (err) {
+      alert('Löschen fehlgeschlagen: ' + err.message);
+    }
+  };
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
@@ -132,6 +174,108 @@ export default function Profile() {
           </div>
         )}
       </section>
+
+      {/* Fischerkarte Wallet */}
+      <section className="bg-white rounded-xl shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+          </svg>
+          Meine Fischerkarte
+        </h2>
+
+        {cardUrl ? (
+          <div className="space-y-3">
+            {/* Vorschau */}
+            <div
+              className="relative rounded-lg overflow-hidden border border-gray-200 cursor-pointer group"
+              onClick={() => setCardFullscreen(true)}
+            >
+              <img
+                src={`${API_URL}${cardUrl}`}
+                alt="Fischerkarte"
+                className="w-full h-auto max-h-48 object-contain bg-gray-50"
+              />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white text-xs px-3 py-1.5 rounded-full">
+                  Vollbild anzeigen
+                </span>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setCardFullscreen(true)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                </svg>
+                Vorzeigen
+              </button>
+              <button
+                onClick={() => cardInputRef.current?.click()}
+                disabled={cardUploading}
+                className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+              >
+                Ersetzen
+              </button>
+              <button
+                onClick={handleCardDelete}
+                className="px-4 py-2.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
+              >
+                Löschen
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={() => cardInputRef.current?.click()}
+            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary-400 hover:bg-primary-50/50 transition-colors"
+          >
+            <svg className="w-10 h-10 text-gray-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+            </svg>
+            <p className="text-sm font-medium text-gray-700">
+              {cardUploading ? 'Wird hochgeladen...' : 'Fischerkarte fotografieren oder hochladen'}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">JPG, PNG oder HEIC</p>
+          </div>
+        )}
+
+        <input
+          ref={cardInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleCardUpload}
+          className="hidden"
+        />
+      </section>
+
+      {/* Fullscreen Fischerkarte */}
+      {cardFullscreen && cardUrl && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col" onClick={() => setCardFullscreen(false)}>
+          <div className="flex items-center justify-between px-4 py-3 bg-black/80">
+            <h3 className="text-white font-medium text-sm">Fischerkarte</h3>
+            <button
+              onClick={() => setCardFullscreen(false)}
+              className="text-white/80 hover:text-white text-2xl font-bold leading-none"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={`${API_URL}${cardUrl}`}
+              alt="Fischerkarte"
+              className="max-w-full max-h-full object-contain rounded-lg"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Schnellzugriff */}
       <section className="bg-white rounded-xl shadow-sm p-6">

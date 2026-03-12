@@ -95,6 +95,9 @@ const SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS idx_licenses_user_year
     ON licenses(user_id, season_year);
+
+  -- Fischerkarte Wallet
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS fisher_card_url TEXT;
 `;
 
 async function migrate() {

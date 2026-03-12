@@ -1,9 +1,12 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
+const path = require('path');
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
 const { JWT_SECRET } = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -109,7 +112,7 @@ router.get('/me', auth, async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT id, email, first_name, last_name, role, birth_date,
-              fisher_card_nr, license_valid_from, license_valid_to
+              fisher_card_nr, fisher_card_url, license_valid_from, license_valid_to
        FROM users WHERE id = $1`,
       [req.user.id]
     );
@@ -127,6 +130,7 @@ router.get('/me', auth, async (req, res) => {
       role: u.role,
       birthDate: u.birth_date,
       fisherCardNr: u.fisher_card_nr,
+      fisherCardUrl: u.fisher_card_url,
       licenseValidFrom: u.license_valid_from,
       licenseValidTo: u.license_valid_to,
     });
@@ -193,6 +197,60 @@ router.get('/license', auth, async (req, res) => {
   } catch (err) {
     console.error('License check error:', err);
     res.status(500).json({ error: 'Fehler beim Laden der Lizenz.' });
+  }
+});
+
+// ── POST /api/auth/fisher-card ─────────────────────────────
+// Fischerkarte hochladen (Wallet)
+router.post('/fisher-card', auth, upload.single('card'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Kein Bild hochgeladen.' });
+    }
+
+    // Alte Karte löschen falls vorhanden
+    const { rows: existing } = await pool.query(
+      'SELECT fisher_card_url FROM users WHERE id = $1', [req.user.id]
+    );
+    if (existing[0]?.fisher_card_url) {
+      const oldPath = path.join(__dirname, '../../', existing[0].fisher_card_url);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+
+    const cardUrl = `/uploads/${req.file.filename}`;
+    await pool.query(
+      'UPDATE users SET fisher_card_url = $1, updated_at = NOW() WHERE id = $2',
+      [cardUrl, req.user.id]
+    );
+
+    res.json({ fisherCardUrl: cardUrl, message: 'Fischerkarte gespeichert.' });
+  } catch (err) {
+    console.error('Fisher card upload error:', err);
+    res.status(500).json({ error: 'Upload fehlgeschlagen.' });
+  }
+});
+
+// ── DELETE /api/auth/fisher-card ───────────────────────────
+// Fischerkarte entfernen
+router.delete('/fisher-card', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT fisher_card_url FROM users WHERE id = $1', [req.user.id]
+    );
+    if (rows[0]?.fisher_card_url) {
+      const filePath = path.join(__dirname, '../../', rows[0].fisher_card_url);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+
+    await pool.query(
+      'UPDATE users SET fisher_card_url = NULL, updated_at = NOW() WHERE id = $1',
+      [req.user.id]
+    );
+
+    res.json({ message: 'Fischerkarte entfernt.' });
+  } catch (err) {
+    console.error('Fisher card delete error:', err);
+    res.status(500).json({ error: 'Löschen fehlgeschlagen.' });
   }
 });
 
