@@ -3,14 +3,16 @@ import { api } from '../../api/client';
 import AdminFisherList from './AdminFisherList';
 import AdminCatchView from './AdminCatchView';
 import AdminInbox from './AdminInbox';
+import AdminStats from './AdminStats';
 
 const TABS = [
+  { id: 'statistik', label: 'Statistik', icon: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z' },
   { id: 'fischkarten', label: 'Fischkarten', icon: 'M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z' },
   { id: 'inbox', label: 'Inbox', icon: 'M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661z' },
 ];
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('fischkarten');
+  const [activeTab, setActiveTab] = useState('statistik');
   const [fishers, setFishers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFisher, setSelectedFisher] = useState(null);
@@ -192,6 +194,10 @@ export default function AdminDashboard() {
       </div>
 
       {/* Tab-Content */}
+      {activeTab === 'statistik' && (
+        <AdminStats />
+      )}
+
       {activeTab === 'fischkarten' && (
         <AdminFisherList
           fishers={fishers}

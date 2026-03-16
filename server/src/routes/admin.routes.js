@@ -338,6 +338,99 @@ router.get('/export/catches', async (req, res) => {
   }
 });
 
+// ── GET /api/admin/stats ─────────────────────────────────────
+// Statistik-Daten für Admin-Dashboard Charts
+router.get('/stats', async (req, res) => {
+  try {
+    const season = req.query.season || new Date().getFullYear();
+
+    // 1. Fänge pro Monat (mit entnommen/zurückgesetzt)
+    const { rows: monthlyRows } = await pool.query(`
+      SELECT
+        EXTRACT(MONTH FROM c.catch_date)::int AS month,
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE c.kept = true)::int AS kept,
+        COUNT(*) FILTER (WHERE c.kept = false)::int AS released
+      FROM catches c
+      WHERE EXTRACT(YEAR FROM c.catch_date) = $1
+      GROUP BY month ORDER BY month
+    `, [season]);
+
+    // Alle 12 Monate füllen
+    const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+    const catchesPerMonth = monthNames.map((name, i) => {
+      const row = monthlyRows.find(r => r.month === i + 1);
+      return { month: name, total: row?.total || 0, kept: row?.kept || 0, released: row?.released || 0 };
+    });
+
+    // 2. Top Fischarten
+    const { rows: speciesRows } = await pool.query(`
+      SELECT COALESCE(cs.german_name, c.fish_species) AS species,
+             COUNT(*)::int AS count
+      FROM catches c
+      LEFT JOIN closed_seasons cs ON cs.fish_species = c.fish_species
+      WHERE EXTRACT(YEAR FROM c.catch_date) = $1
+      GROUP BY species ORDER BY count DESC LIMIT 8
+    `, [season]);
+
+    // 3. Fischtage pro Fischer (Top 10)
+    const { rows: fisherActivityRows } = await pool.query(`
+      SELECT u.first_name || ' ' || LEFT(u.last_name, 1) || '.' AS fisher,
+             COUNT(DISTINCT fd.id)::int AS fishing_days,
+             COUNT(c.id)::int AS catches
+      FROM users u
+      LEFT JOIN fishing_days fd ON fd.user_id = u.id AND fd.season_year = $1
+      LEFT JOIN catches c ON c.fishing_day_id = fd.id
+      WHERE u.role != 'admin'
+        AND (fd.id IS NOT NULL)
+      GROUP BY u.id, u.first_name, u.last_name
+      ORDER BY fishing_days DESC
+      LIMIT 10
+    `, [season]);
+
+    // 4. Übersicht: Tage mit Fang vs. ohne Fang
+    const { rows: dayStats } = await pool.query(`
+      SELECT
+        COUNT(*)::int AS total_days,
+        COUNT(*) FILTER (WHERE sub.catch_count > 0)::int AS days_with_catch,
+        COUNT(*) FILTER (WHERE sub.catch_count = 0)::int AS days_without_catch
+      FROM (
+        SELECT fd.id, COUNT(c.id) AS catch_count
+        FROM fishing_days fd
+        LEFT JOIN catches c ON c.fishing_day_id = fd.id
+        WHERE fd.season_year = $1
+        GROUP BY fd.id
+      ) sub
+    `, [season]);
+
+    // 5. Gesamtzahlen
+    const { rows: totals } = await pool.query(`
+      SELECT
+        (SELECT COUNT(DISTINCT id) FROM users WHERE role != 'admin') AS fisher_count,
+        (SELECT COUNT(*) FROM fishing_days WHERE season_year = $1) AS total_days,
+        (SELECT COUNT(*) FROM catches WHERE EXTRACT(YEAR FROM catch_date) = $1) AS total_catches,
+        (SELECT COUNT(*) FROM catches WHERE EXTRACT(YEAR FROM catch_date) = $1 AND kept = true) AS total_kept
+    `, [season]);
+
+    res.json({
+      season: parseInt(season),
+      totals: {
+        fisherCount: parseInt(totals[0].fisher_count),
+        totalDays: parseInt(totals[0].total_days),
+        totalCatches: parseInt(totals[0].total_catches),
+        totalKept: parseInt(totals[0].total_kept),
+      },
+      catchesPerMonth,
+      topSpecies: speciesRows,
+      fisherActivity: fisherActivityRows,
+      dayStats: dayStats[0] || { total_days: 0, days_with_catch: 0, days_without_catch: 0 },
+    });
+  } catch (err) {
+    console.error('Stats error:', err);
+    res.status(500).json({ error: 'Fehler beim Laden der Statistiken.' });
+  }
+});
+
 // ── GET /api/admin/notifications ─────────────────────────────
 // Admin-Inbox: alle Benachrichtigungen
 router.get('/notifications', async (req, res) => {
