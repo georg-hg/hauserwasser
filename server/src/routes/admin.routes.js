@@ -146,46 +146,93 @@ router.get('/fishers/:id/catches', async (req, res) => {
 });
 
 // ── GET /api/admin/export/catches ───────────────────────────
-// Excel-Export aller Fangbücher
+// Excel-Export aller Fangbücher (Fischtag-basiert)
 router.get('/export/catches', async (req, res) => {
   try {
     const season = req.query.season || new Date().getFullYear();
     const fisherId = req.query.fisherId; // optional: nur ein Fischer
 
-    let query = `
-      SELECT c.catch_date, c.catch_time, c.fish_species,
-             cs.german_name, c.length_cm, c.weight_kg,
-             c.technique, c.kept, c.latitude, c.longitude,
-             c.location_name, c.notes,
+    // 1. Alle Fischtage mit zugehörigen Fängen laden
+    let dayQuery = `
+      SELECT fd.id as day_id, fd.fishing_date, fd.technique as day_technique,
+             fd.notes as day_notes, fd.completed,
+             u.first_name, u.last_name, u.email, u.fisher_card_nr, u.id as user_id
+      FROM fishing_days fd
+      JOIN users u ON u.id = fd.user_id
+      WHERE fd.season_year = $1
+    `;
+    const dayParams = [season];
+
+    if (fisherId) {
+      dayQuery += ' AND fd.user_id = $2';
+      dayParams.push(fisherId);
+    }
+
+    dayQuery += ' ORDER BY u.last_name, u.first_name, fd.fishing_date';
+
+    const { rows: days } = await pool.query(dayQuery, dayParams);
+
+    // 2. Alle Fänge der Saison laden (inkl. Fänge ohne fishing_day_id für Rückwärtskompatibilität)
+    let catchQuery = `
+      SELECT c.*, cs.german_name,
              u.first_name, u.last_name, u.email, u.fisher_card_nr
       FROM catches c
       JOIN users u ON u.id = c.user_id
       LEFT JOIN closed_seasons cs ON cs.fish_species = c.fish_species
       WHERE EXTRACT(YEAR FROM c.catch_date) = $1
     `;
-    const params = [season];
+    const catchParams = [season];
 
     if (fisherId) {
-      query += ' AND c.user_id = $2';
-      params.push(fisherId);
+      catchQuery += ' AND c.user_id = $2';
+      catchParams.push(fisherId);
     }
 
-    query += ' ORDER BY u.last_name, u.first_name, c.catch_date, c.catch_time';
+    catchQuery += ' ORDER BY u.last_name, u.first_name, c.catch_date, c.catch_time';
 
-    const { rows } = await pool.query(query, params);
+    const { rows: catches } = await pool.query(catchQuery, catchParams);
 
     // Excel-Workbook erstellen
     const wb = new ExcelJS.Workbook();
     wb.creator = 'Hauserwasser Fangbuch';
     wb.created = new Date();
 
-    const ws = wb.addWorksheet(`Fangbuch ${season}`, {
-      headerFooter: {
-        firstHeader: `Hauserwasser Fangbuch – Saison ${season}`,
-      },
+    // ── Sheet 1: Fischtage ────────────────────────────
+    const dayWs = wb.addWorksheet(`Fischtage ${season}`, {
+      headerFooter: { firstHeader: `Hauserwasser Fischtage – Saison ${season}` },
     });
 
-    // Spalten definieren
+    dayWs.columns = [
+      { header: 'Fischer', key: 'fisher', width: 22 },
+      { header: 'Datum', key: 'date', width: 14 },
+      { header: 'Methode', key: 'technique', width: 16 },
+      { header: 'Fänge', key: 'catchCount', width: 10 },
+      { header: 'Entnommen', key: 'keptCount', width: 12 },
+      { header: 'Abgeschlossen', key: 'completed', width: 14 },
+      { header: 'Notizen', key: 'notes', width: 30 },
+    ];
+
+    dayWs.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    dayWs.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+
+    days.forEach(d => {
+      const dayCatches = catches.filter(c => c.fishing_day_id === d.day_id);
+      dayWs.addRow({
+        fisher: `${d.last_name} ${d.first_name}`,
+        date: d.fishing_date ? new Date(d.fishing_date).toLocaleDateString('de-AT') : '',
+        technique: d.day_technique || '',
+        catchCount: dayCatches.length,
+        keptCount: dayCatches.filter(c => c.kept).length,
+        completed: d.completed ? 'Ja' : 'Offen',
+        notes: d.day_notes || '',
+      });
+    });
+
+    // ── Sheet 2: Fänge (Detail) ────────────────────────
+    const ws = wb.addWorksheet(`Fangbuch ${season}`, {
+      headerFooter: { firstHeader: `Hauserwasser Fangbuch – Saison ${season}` },
+    });
+
     ws.columns = [
       { header: 'Fischer', key: 'fisher', width: 22 },
       { header: 'E-Mail', key: 'email', width: 25 },
@@ -203,16 +250,10 @@ router.get('/export/catches', async (req, res) => {
       { header: 'Anmerkungen', key: 'notes', width: 30 },
     ];
 
-    // Header-Zeile formatieren
-    ws.getRow(1).font = { bold: true, size: 11 };
-    ws.getRow(1).fill = {
-      type: 'pattern', pattern: 'solid',
-      fgColor: { argb: 'FF1E3A5F' },
-    };
     ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
 
-    // Daten eintragen
-    rows.forEach(r => {
+    catches.forEach(r => {
       ws.addRow({
         fisher: `${r.last_name} ${r.first_name}`,
         email: r.email,
@@ -231,42 +272,56 @@ router.get('/export/catches', async (req, res) => {
       });
     });
 
-    // Zusammenfassung als zweites Sheet
+    // ── Sheet 3: Zusammenfassung ───────────────────────
     const summaryWs = wb.addWorksheet('Zusammenfassung');
     summaryWs.columns = [
       { header: 'Fischer', key: 'fisher', width: 25 },
+      { header: 'Fischtage', key: 'fishingDays', width: 14 },
+      { header: 'Tage ohne Fang', key: 'emptyDays', width: 16 },
       { header: 'Gesamtfänge', key: 'total', width: 14 },
       { header: 'Entnommen', key: 'kept', width: 14 },
       { header: 'Zurückgesetzt', key: 'released', width: 14 },
-      { header: 'Fischtage', key: 'fishingDays', width: 14 },
     ];
     summaryWs.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
     summaryWs.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
 
-    // Aggregation pro Fischer
+    // Aggregation pro Fischer (aus echter fishing_days Tabelle)
     const fisherMap = {};
-    rows.forEach(r => {
+
+    // Fischtage zählen
+    days.forEach(d => {
+      const key = d.email;
+      if (!fisherMap[key]) {
+        fisherMap[key] = { fisher: `${d.last_name} ${d.first_name}`, fishingDays: 0, total: 0, kept: 0, released: 0 };
+      }
+      fisherMap[key].fishingDays++;
+    });
+
+    // Fänge zählen
+    catches.forEach(r => {
       const key = r.email;
       if (!fisherMap[key]) {
-        fisherMap[key] = {
-          fisher: `${r.last_name} ${r.first_name}`,
-          total: 0, kept: 0, released: 0,
-          dates: new Set(),
-        };
+        fisherMap[key] = { fisher: `${r.last_name} ${r.first_name}`, fishingDays: 0, total: 0, kept: 0, released: 0 };
       }
       fisherMap[key].total++;
       if (r.kept) fisherMap[key].kept++;
       else fisherMap[key].released++;
-      if (r.catch_date) fisherMap[key].dates.add(r.catch_date.toISOString().slice(0, 10));
     });
 
     Object.values(fisherMap).forEach(f => {
+      // Fischtage ohne Fang = Fischtage total - Tage mit mindestens einem Fang
+      const daysWithCatch = new Set(
+        catches.filter(c => c.email === Object.keys(fisherMap).find(k => fisherMap[k] === f))
+          .map(c => c.catch_date?.toISOString?.()?.slice(0, 10))
+          .filter(Boolean)
+      ).size;
       summaryWs.addRow({
         fisher: f.fisher,
+        fishingDays: f.fishingDays,
+        emptyDays: Math.max(0, f.fishingDays - daysWithCatch),
         total: f.total,
         kept: f.kept,
         released: f.released,
-        fishingDays: f.dates.size,
       });
     });
 
