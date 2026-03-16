@@ -74,6 +74,10 @@ const SCHEMA = `
     user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     fishing_date    DATE NOT NULL,
     season_year     INTEGER NOT NULL,
+    technique       VARCHAR(50),
+    notes           TEXT,
+    completed       BOOLEAN DEFAULT false,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id, fishing_date)
   );
 

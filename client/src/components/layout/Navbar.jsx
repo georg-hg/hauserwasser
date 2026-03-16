@@ -5,7 +5,7 @@ import { api } from '../../api/client';
 
 const FISHER_ITEMS = [
   { path: '/', label: 'Dashboard' },
-  { path: '/fang/neu', label: 'Neuer Fang' },
+  { path: '/fischtag/neu', label: 'Fischtag' },
   { path: '/fangbuch', label: 'Fangbuch' },
   { path: '/renaturierung?tab=dokumentation', label: 'Sichtungen' },
   { path: '/schonzeiten', label: 'Schonzeiten' },

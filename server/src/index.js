@@ -51,6 +51,7 @@ app.use('/api/seasons', require('./routes/seasons.routes'));
 app.use('/api/fish-id', require('./routes/fish-id.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
 app.use('/api/water', require('./routes/water.routes'));
+app.use('/api/fishing-days', require('./routes/fishing-days.routes'));
 app.use('/api/weather', require('./routes/weather.routes'));
 app.use('/api/monitoring', require('./routes/monitoring.routes'));
 app.use('/api/predators', require('./routes/predators.routes'));
@@ -151,6 +152,33 @@ async function autoMigrate() {
         ON predator_sightings(user_id, sighted_at DESC);
       CREATE INDEX IF NOT EXISTS idx_predator_sightings_date
         ON predator_sightings(sighted_at DESC);
+    `);
+
+    // Fischtag-Erweiterung: technique, notes, completed
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'fishing_days' AND column_name = 'technique'
+        ) THEN
+          ALTER TABLE fishing_days ADD COLUMN technique VARCHAR(50);
+          ALTER TABLE fishing_days ADD COLUMN notes TEXT;
+          ALTER TABLE fishing_days ADD COLUMN completed BOOLEAN DEFAULT false;
+          ALTER TABLE fishing_days ADD COLUMN created_at TIMESTAMPTZ DEFAULT NOW();
+        END IF;
+      END $$;
+    `);
+
+    // Catches: fishing_day_id FK
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'catches' AND column_name = 'fishing_day_id'
+        ) THEN
+          ALTER TABLE catches ADD COLUMN fishing_day_id UUID REFERENCES fishing_days(id) ON DELETE SET NULL;
+        END IF;
+      END $$;
     `);
 
     console.log('✓ Auto-Migration erfolgreich.');

@@ -6,6 +6,8 @@ import MobileNav from './components/layout/MobileNav';
 import Dashboard from './components/dashboard/Dashboard';
 import CatchForm from './components/catch/CatchForm';
 import CatchList from './components/catch/CatchList';
+import FishingDayForm from './components/catch/FishingDayForm';
+import FishingDayDetail from './components/catch/FishingDayDetail';
 import ImageUpload from './components/fish-id/ImageUpload';
 import Regulations from './components/knowledge/Regulations';
 import ClosedSeasons from './components/knowledge/ClosedSeasons';
@@ -73,6 +75,8 @@ export default function App() {
                 : <Dashboard />}
             </ProtectedRoute>
           } />
+          <Route path="/fischtag/neu" element={<ProtectedRoute><FishingDayForm /></ProtectedRoute>} />
+          <Route path="/fischtag/:id" element={<ProtectedRoute><FishingDayDetail /></ProtectedRoute>} />
           <Route path="/fang/neu" element={<ProtectedRoute><CatchForm /></ProtectedRoute>} />
           <Route path="/fangbuch" element={<ProtectedRoute><CatchList /></ProtectedRoute>} />
           <Route path="/erkennung" element={<ProtectedRoute><ImageUpload /></ProtectedRoute>} />
