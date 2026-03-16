@@ -29,6 +29,11 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
+// ── Root (für UptimeRobot) ────────────────────────────────
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', app: 'Hauserwasser API' });
+});
+
 // ── Health Check ───────────────────────────────────────────
 app.get('/api/health', async (req, res) => {
   try {
