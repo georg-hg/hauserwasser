@@ -1,4 +1,4 @@
-export default function AdminFisherList({ fishers, onToggleLicense, onToggleBlock, onDeleteFisher, onSelectFisher, onExportFisher, currentYear }) {
+export default function AdminFisherList({ fishers, onToggleLicense, onToggleBlock, onDeleteFisher, onSelectFisher, onExportFisher, onResetPassword, onChangeEmail, currentYear }) {
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       {/* Desktop Table */}
@@ -78,6 +78,18 @@ export default function AdminFisherList({ fishers, onToggleLicense, onToggleBloc
                       Fangbuch
                     </button>
                     <button
+                      onClick={() => onResetPassword(f)}
+                      className="text-amber-600 hover:text-amber-800 text-xs font-medium"
+                    >
+                      Passwort
+                    </button>
+                    <button
+                      onClick={() => onChangeEmail(f)}
+                      className="text-indigo-600 hover:text-indigo-800 text-xs font-medium"
+                    >
+                      E-Mail
+                    </button>
+                    <button
                       onClick={() => onExportFisher(f)}
                       className="text-green-600 hover:text-green-800 text-xs font-medium"
                     >
@@ -145,9 +157,15 @@ export default function AdminFisherList({ fishers, onToggleLicense, onToggleBloc
               </button>
             </div>
 
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 flex-wrap">
               <button onClick={() => onSelectFisher(f)} className="text-primary-600 text-xs font-medium">
                 Fangbuch
+              </button>
+              <button onClick={() => onResetPassword(f)} className="text-amber-600 text-xs font-medium">
+                Passwort
+              </button>
+              <button onClick={() => onChangeEmail(f)} className="text-indigo-600 text-xs font-medium">
+                E-Mail
               </button>
               <button onClick={() => onExportFisher(f)} className="text-green-600 text-xs font-medium">
                 Excel

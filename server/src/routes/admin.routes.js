@@ -538,6 +538,65 @@ router.put('/fishers/:id/unblock', async (req, res) => {
   }
 });
 
+// ── PUT /api/admin/fishers/:id/reset-password ────────────────
+// Passwort zurücksetzen (Admin setzt temporäres Passwort)
+router.put('/fishers/:id/reset-password', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Passwort muss mindestens 8 Zeichen haben.' });
+    }
+
+    const { rows } = await pool.query('SELECT id, role, first_name, last_name FROM users WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Fischer nicht gefunden.' });
+    if (rows[0].role === 'admin') return res.status(403).json({ error: 'Admin-Passwort kann hier nicht geändert werden.' });
+
+    const bcrypt = require('bcryptjs');
+    const hash = await bcrypt.hash(newPassword, 12);
+    await pool.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [hash, id]);
+
+    console.log(`[Admin] Passwort zurückgesetzt für: ${rows[0].first_name} ${rows[0].last_name} (ID: ${id})`);
+    res.json({ message: `Passwort für "${rows[0].first_name} ${rows[0].last_name}" wurde zurückgesetzt.` });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Fehler beim Zurücksetzen des Passworts.' });
+  }
+});
+
+// ── PUT /api/admin/fishers/:id/email ─────────────────────────
+// E-Mail-Adresse ändern
+router.put('/fishers/:id/email', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newEmail } = req.body;
+
+    if (!newEmail || !newEmail.includes('@')) {
+      return res.status(400).json({ error: 'Gültige E-Mail-Adresse erforderlich.' });
+    }
+
+    const { rows } = await pool.query('SELECT id, role, first_name, last_name, email FROM users WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Fischer nicht gefunden.' });
+    if (rows[0].role === 'admin') return res.status(403).json({ error: 'Admin-E-Mail kann hier nicht geändert werden.' });
+
+    // Prüfen ob neue E-Mail schon vergeben
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1 AND id != $2', [newEmail.toLowerCase(), id]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
+    }
+
+    const oldEmail = rows[0].email;
+    await pool.query('UPDATE users SET email = $1, updated_at = NOW() WHERE id = $2', [newEmail.toLowerCase(), id]);
+
+    console.log(`[Admin] E-Mail geändert für: ${rows[0].first_name} ${rows[0].last_name} (${oldEmail} → ${newEmail})`);
+    res.json({ message: `E-Mail für "${rows[0].first_name} ${rows[0].last_name}" geändert auf ${newEmail}.` });
+  } catch (err) {
+    console.error('Change email error:', err);
+    res.status(500).json({ error: 'Fehler beim Ändern der E-Mail.' });
+  }
+});
+
 // ── DELETE /api/admin/fishers/:id ─────────────────────────────
 // User komplett löschen (inkl. Fänge, Lizenzen, Notifications)
 router.delete('/fishers/:id', async (req, res) => {

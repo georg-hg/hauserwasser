@@ -92,6 +92,41 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleResetPassword = async (fisher) => {
+    const newPw = prompt(
+      `Neues Passwort für "${fisher.lastName} ${fisher.firstName}" eingeben (mind. 8 Zeichen):`
+    );
+    if (!newPw) return;
+    if (newPw.length < 8) {
+      alert('Passwort muss mindestens 8 Zeichen haben.');
+      return;
+    }
+    try {
+      const result = await api.put(`/api/admin/fishers/${fisher.id}/reset-password`, { newPassword: newPw });
+      alert(result.message);
+    } catch (err) {
+      alert('Fehler: ' + err.message);
+    }
+  };
+
+  const handleChangeEmail = async (fisher) => {
+    const newEmail = prompt(
+      `Neue E-Mail-Adresse für "${fisher.lastName} ${fisher.firstName}" eingeben:\n\nAktuell: ${fisher.email}`
+    );
+    if (!newEmail) return;
+    if (!newEmail.includes('@')) {
+      alert('Bitte eine gültige E-Mail-Adresse eingeben.');
+      return;
+    }
+    try {
+      const result = await api.put(`/api/admin/fishers/${fisher.id}/email`, { newEmail });
+      alert(result.message);
+      loadFishers();
+    } catch (err) {
+      alert('Fehler: ' + err.message);
+    }
+  };
+
   const handleExport = async (fisherId = null) => {
     setExporting(true);
     try {
@@ -206,6 +241,8 @@ export default function AdminDashboard() {
           onDeleteFisher={deleteFisher}
           onSelectFisher={setSelectedFisher}
           onExportFisher={(fisher) => handleExport(fisher.id)}
+          onResetPassword={handleResetPassword}
+          onChangeEmail={handleChangeEmail}
           currentYear={currentYear}
         />
       )}
