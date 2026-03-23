@@ -85,6 +85,31 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
+// ── PUT /api/fishing-days/:id ─────────────────────────────
+// Fischtag bearbeiten (Technik, Notizen)
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const { technique, notes } = req.body;
+
+    const { rows } = await pool.query(`
+      UPDATE fishing_days SET
+        technique = $1,
+        notes = $2
+      WHERE id = $3 AND user_id = $4
+      RETURNING *
+    `, [technique || null, notes || null, req.params.id, req.user.id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Fischtag nicht gefunden.' });
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('PUT /fishing-days/:id error:', err);
+    res.status(500).json({ error: 'Fischtag konnte nicht aktualisiert werden.' });
+  }
+});
+
 // ── PUT /api/fishing-days/:id/complete ───────────────────
 // Fischtag abschließen (mit oder ohne Fänge)
 router.put('/:id/complete', auth, async (req, res) => {

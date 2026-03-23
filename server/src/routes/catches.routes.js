@@ -197,22 +197,39 @@ router.post('/', auth, upload.single('photo'), async (req, res) => {
 });
 
 // ── PUT /api/catches/:id ───────────────────────────────────
+// Fang bearbeiten (alle Felder)
 router.put('/:id', auth, async (req, res) => {
   try {
-    const { fishSpecies, lengthCm, weightKg, technique, kept, notes } = req.body;
+    const {
+      catchDate, catchTime, latitude, longitude, locationName,
+      fishSpecies, lengthCm, weightKg, technique, kept, notes,
+    } = req.body;
 
     const { rows } = await pool.query(
       `UPDATE catches SET
-        fish_species = COALESCE($1, fish_species),
-        length_cm = COALESCE($2, length_cm),
-        weight_kg = COALESCE($3, weight_kg),
-        technique = COALESCE($4, technique),
-        kept = COALESCE($5, kept),
-        notes = COALESCE($6, notes),
+        catch_date = COALESCE($1, catch_date),
+        catch_time = COALESCE($2, catch_time),
+        latitude = COALESCE($3, latitude),
+        longitude = COALESCE($4, longitude),
+        location_name = COALESCE($5, location_name),
+        fish_species = COALESCE($6, fish_species),
+        length_cm = $7,
+        weight_kg = $8,
+        technique = COALESCE($9, technique),
+        kept = COALESCE($10, kept),
+        notes = $11,
         updated_at = NOW()
-      WHERE id = $7 AND user_id = $8
+      WHERE id = $12 AND user_id = $13
       RETURNING *`,
-      [fishSpecies, lengthCm, weightKg, technique, kept, notes, req.params.id, req.user.id]
+      [
+        catchDate || null, catchTime || null,
+        latitude ? parseFloat(latitude) : null, longitude ? parseFloat(longitude) : null,
+        locationName || null, fishSpecies || null,
+        lengthCm != null ? parseFloat(lengthCm) : null,
+        weightKg != null ? parseFloat(weightKg) : null,
+        technique || null, kept, notes != null ? notes : null,
+        req.params.id, req.user.id,
+      ]
     );
 
     if (rows.length === 0) {
