@@ -1,18 +1,28 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../../hooks/useAuth';
 import { api } from '../../api/client';
 import AdminFisherList from './AdminFisherList';
 import AdminCatchView from './AdminCatchView';
 import AdminInbox from './AdminInbox';
 import AdminStats from './AdminStats';
+import AmWasser from './AmWasser';
 
-const TABS = [
-  { id: 'statistik', label: 'Statistik', icon: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z' },
-  { id: 'fischkarten', label: 'Fischkarten', icon: 'M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z' },
-  { id: 'inbox', label: 'Inbox', icon: 'M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661z' },
-];
+const TAB_DEFS = {
+  statistik: { id: 'statistik', label: 'Statistik', icon: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z', roles: ['admin', 'kontrolleur'] },
+  amwasser: { id: 'amwasser', label: 'Am Wasser', icon: 'M15 10.5a3 3 0 11-6 0 3 3 0 016 0z M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z', roles: ['admin', 'kontrolleur'] },
+  fischkarten: { id: 'fischkarten', label: 'Fischkarten', icon: 'M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z', roles: ['admin'] },
+  inbox: { id: 'inbox', label: 'Inbox', icon: 'M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661z', roles: ['admin'] },
+};
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('statistik');
+  const { user } = useAuth();
+  const userRole = user?.role || 'fischer';
+  const isAdmin = userRole === 'admin';
+
+  // Tabs basierend auf Rolle filtern
+  const tabs = Object.values(TAB_DEFS).filter(t => t.roles.includes(userRole));
+
+  const [activeTab, setActiveTab] = useState(tabs[0]?.id || 'statistik');
   const [fishers, setFishers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFisher, setSelectedFisher] = useState(null);
@@ -21,6 +31,7 @@ export default function AdminDashboard() {
   const currentYear = new Date().getFullYear();
 
   const loadFishers = async () => {
+    if (!isAdmin) { setLoading(false); return; }
     try {
       const data = await api.get('/api/admin/fishers');
       setFishers(data);
@@ -32,18 +43,18 @@ export default function AdminDashboard() {
   };
 
   const loadUnreadCount = useCallback(async () => {
+    if (!isAdmin) return;
     try {
       const data = await api.get('/api/admin/notifications/unread-count');
       setUnreadCount(data.count);
     } catch (err) {
       console.error('Unread count error:', err);
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     loadFishers();
     loadUnreadCount();
-    // Alle 30 Sekunden auf neue Notifications prüfen
     const interval = setInterval(loadUnreadCount, 30000);
     return () => clearInterval(interval);
   }, [loadUnreadCount]);
@@ -127,6 +138,22 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleChangeRole = async (fisher) => {
+    const newRole = fisher.role === 'kontrolleur' ? 'fischer' : 'kontrolleur';
+    const label = newRole === 'kontrolleur' ? 'Kontrolleur' : 'Fischer';
+    const confirmed = confirm(
+      `Rolle für "${fisher.lastName} ${fisher.firstName}" auf "${label}" ändern?`
+    );
+    if (!confirmed) return;
+    try {
+      const result = await api.put(`/api/admin/fishers/${fisher.id}/role`, { role: newRole });
+      alert(result.message);
+      loadFishers();
+    } catch (err) {
+      alert('Fehler: ' + err.message);
+    }
+  };
+
   const handleExport = async (fisherId = null) => {
     setExporting(true);
     try {
@@ -183,12 +210,15 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Admin-Bereich</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isAdmin ? 'Admin-Bereich' : 'Kontrolleur'}
+          </h1>
           <p className="text-gray-500 text-sm mt-1">
-            Saison {currentYear} &middot; {fishers.length} registrierte Fischer
+            Saison {currentYear}
+            {isAdmin && <> &middot; {fishers.length} registrierte Fischer</>}
           </p>
         </div>
-        {activeTab === 'fischkarten' && (
+        {activeTab === 'fischkarten' && isAdmin && (
           <button
             onClick={() => handleExport()}
             disabled={exporting}
@@ -204,12 +234,12 @@ export default function AdminDashboard() {
       </div>
 
       {/* Tab-Navigation */}
-      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl">
-        {TABS.map((tab) => (
+      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl overflow-x-auto">
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
               activeTab === tab.id
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
@@ -233,7 +263,11 @@ export default function AdminDashboard() {
         <AdminStats />
       )}
 
-      {activeTab === 'fischkarten' && (
+      {activeTab === 'amwasser' && (
+        <AmWasser />
+      )}
+
+      {activeTab === 'fischkarten' && isAdmin && (
         <AdminFisherList
           fishers={fishers}
           onToggleLicense={toggleLicense}
@@ -243,11 +277,12 @@ export default function AdminDashboard() {
           onExportFisher={(fisher) => handleExport(fisher.id)}
           onResetPassword={handleResetPassword}
           onChangeEmail={handleChangeEmail}
+          onChangeRole={handleChangeRole}
           currentYear={currentYear}
         />
       )}
 
-      {activeTab === 'inbox' && (
+      {activeTab === 'inbox' && isAdmin && (
         <AdminInbox onUnreadChange={setUnreadCount} />
       )}
     </div>

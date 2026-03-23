@@ -13,7 +13,7 @@ const FISHER_ITEMS = [
 ];
 
 const ADMIN_ITEMS = [
-  { path: '/revier', label: 'Revier' },
+  { path: '/revier', label: 'Revier', adminOnly: true },
   { path: '/admin', label: 'Admin' },
 ];
 
@@ -21,7 +21,12 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isAdmin = user?.role === 'admin';
-  const navItems = isAdmin ? [...FISHER_ITEMS, ...ADMIN_ITEMS] : FISHER_ITEMS;
+  const isKontrolleur = user?.role === 'kontrolleur';
+  const showAdmin = isAdmin || isKontrolleur;
+  const adminItems = showAdmin
+    ? ADMIN_ITEMS.filter(item => !item.adminOnly || isAdmin)
+    : [];
+  const navItems = [...FISHER_ITEMS, ...adminItems];
   const [unreadCount, setUnreadCount] = useState(0);
 
   const loadUnread = useCallback(async () => {

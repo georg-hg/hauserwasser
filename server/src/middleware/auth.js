@@ -1,6 +1,20 @@
 const jwt = require('jsonwebtoken');
+const pool = require('../config/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+
+// Throttle: last_seen maximal alle 60 Sekunden pro User updaten
+const lastSeenCache = new Map();
+const LAST_SEEN_INTERVAL = 60 * 1000; // 60 Sekunden
+
+function updateLastSeen(userId) {
+  const now = Date.now();
+  const last = lastSeenCache.get(userId) || 0;
+  if (now - last > LAST_SEEN_INTERVAL) {
+    lastSeenCache.set(userId, now);
+    pool.query('UPDATE users SET last_seen = NOW() WHERE id = $1', [userId]).catch(() => {});
+  }
+}
 
 /**
  * JWT-Auth Middleware
@@ -16,6 +30,8 @@ function auth(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded; // { id, email, role }
+    // last_seen aktualisieren (throttled)
+    updateLastSeen(decoded.id);
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {

@@ -6,12 +6,28 @@ const { requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Alle Routen erfordern Admin-Rolle
-router.use(auth, requireRole('admin'));
+// Basis-Auth für alle Admin-Routen
+router.use(auth);
+
+// Middleware: Admin oder Kontrolleur
+function adminOrKontrolleur(req, res, next) {
+  if (!req.user || !['admin', 'kontrolleur'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Keine Berechtigung.' });
+  }
+  next();
+}
+
+// Middleware: Nur Admin
+function adminOnly(req, res, next) {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Keine Berechtigung.' });
+  }
+  next();
+}
 
 // ── GET /api/admin/fishers ──────────────────────────────────
 // Alle registrierten Fischer mit Lizenzstatus
-router.get('/fishers', async (req, res) => {
+router.get('/fishers', adminOnly, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT u.id, u.email, u.first_name, u.last_name, u.role,
@@ -54,7 +70,7 @@ router.get('/fishers', async (req, res) => {
 
 // ── POST /api/admin/fishers/:id/license ─────────────────────
 // Jahreslizenz freischalten
-router.post('/fishers/:id/license', async (req, res) => {
+router.post('/fishers/:id/license', adminOnly, async (req, res) => {
   try {
     const { id } = req.params;
     const year = req.body.year || new Date().getFullYear();
@@ -91,7 +107,7 @@ router.post('/fishers/:id/license', async (req, res) => {
 
 // ── DELETE /api/admin/fishers/:id/license ────────────────────
 // Jahreslizenz widerrufen
-router.delete('/fishers/:id/license', async (req, res) => {
+router.delete('/fishers/:id/license', adminOnly, async (req, res) => {
   try {
     const { id } = req.params;
     const year = req.query.year || new Date().getFullYear();
@@ -110,7 +126,7 @@ router.delete('/fishers/:id/license', async (req, res) => {
 
 // ── GET /api/admin/fishers/:id/catches ──────────────────────
 // Fangbuch eines bestimmten Fischers
-router.get('/fishers/:id/catches', async (req, res) => {
+router.get('/fishers/:id/catches', adminOnly, async (req, res) => {
   try {
     const { id } = req.params;
     const season = req.query.season || new Date().getFullYear();
@@ -147,7 +163,7 @@ router.get('/fishers/:id/catches', async (req, res) => {
 
 // ── GET /api/admin/export/catches ───────────────────────────
 // Excel-Export aller Fangbücher (Fischtag-basiert)
-router.get('/export/catches', async (req, res) => {
+router.get('/export/catches', adminOnly, async (req, res) => {
   try {
     const season = req.query.season || new Date().getFullYear();
     const fisherId = req.query.fisherId; // optional: nur ein Fischer
@@ -339,8 +355,8 @@ router.get('/export/catches', async (req, res) => {
 });
 
 // ── GET /api/admin/stats ─────────────────────────────────────
-// Statistik-Daten für Admin-Dashboard Charts
-router.get('/stats', async (req, res) => {
+// Statistik-Daten für Admin-Dashboard Charts (Admin + Kontrolleur)
+router.get('/stats', adminOrKontrolleur, async (req, res) => {
   try {
     const season = req.query.season || new Date().getFullYear();
 
@@ -433,7 +449,7 @@ router.get('/stats', async (req, res) => {
 
 // ── GET /api/admin/notifications ─────────────────────────────
 // Admin-Inbox: alle Benachrichtigungen
-router.get('/notifications', async (req, res) => {
+router.get('/notifications', adminOnly, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT n.*, u.first_name, u.last_name, u.email, u.fisher_card_nr, u.blocked
@@ -466,7 +482,7 @@ router.get('/notifications', async (req, res) => {
 
 // ── GET /api/admin/notifications/unread-count ────────────────
 // Anzahl ungelesener Notifications (für Badge)
-router.get('/notifications/unread-count', async (req, res) => {
+router.get('/notifications/unread-count', adminOnly, async (req, res) => {
   try {
     const { rows } = await pool.query(
       'SELECT COUNT(*) AS count FROM admin_notifications WHERE read = false'
@@ -480,7 +496,7 @@ router.get('/notifications/unread-count', async (req, res) => {
 
 // ── PUT /api/admin/notifications/read-all ────────────────────
 // Alle Notifications als gelesen markieren (MUSS vor :id stehen!)
-router.put('/notifications/read-all', async (req, res) => {
+router.put('/notifications/read-all', adminOnly, async (req, res) => {
   try {
     await pool.query('UPDATE admin_notifications SET read = true WHERE read = false');
     res.json({ message: 'Alle gelesen.' });
@@ -492,7 +508,7 @@ router.put('/notifications/read-all', async (req, res) => {
 
 // ── PUT /api/admin/notifications/:id/read ────────────────────
 // Einzelne Notification als gelesen markieren
-router.put('/notifications/:id/read', async (req, res) => {
+router.put('/notifications/:id/read', adminOnly, async (req, res) => {
   try {
     await pool.query(
       'UPDATE admin_notifications SET read = true WHERE id = $1',
@@ -507,7 +523,7 @@ router.put('/notifications/:id/read', async (req, res) => {
 
 // ── PUT /api/admin/fishers/:id/block ─────────────────────────
 // User sperren
-router.put('/fishers/:id/block', async (req, res) => {
+router.put('/fishers/:id/block', adminOnly, async (req, res) => {
   try {
     const { reason } = req.body;
     await pool.query(
@@ -524,7 +540,7 @@ router.put('/fishers/:id/block', async (req, res) => {
 
 // ── PUT /api/admin/fishers/:id/unblock ───────────────────────
 // User entsperren
-router.put('/fishers/:id/unblock', async (req, res) => {
+router.put('/fishers/:id/unblock', adminOnly, async (req, res) => {
   try {
     await pool.query(
       `UPDATE users SET blocked = false, blocked_at = NULL, blocked_reason = NULL
@@ -540,7 +556,7 @@ router.put('/fishers/:id/unblock', async (req, res) => {
 
 // ── PUT /api/admin/fishers/:id/reset-password ────────────────
 // Passwort zurücksetzen (Admin setzt temporäres Passwort)
-router.put('/fishers/:id/reset-password', async (req, res) => {
+router.put('/fishers/:id/reset-password', adminOnly, async (req, res) => {
   try {
     const { id } = req.params;
     const { newPassword } = req.body;
@@ -567,7 +583,7 @@ router.put('/fishers/:id/reset-password', async (req, res) => {
 
 // ── PUT /api/admin/fishers/:id/email ─────────────────────────
 // E-Mail-Adresse ändern
-router.put('/fishers/:id/email', async (req, res) => {
+router.put('/fishers/:id/email', adminOnly, async (req, res) => {
   try {
     const { id } = req.params;
     const { newEmail } = req.body;
@@ -599,7 +615,7 @@ router.put('/fishers/:id/email', async (req, res) => {
 
 // ── DELETE /api/admin/fishers/:id ─────────────────────────────
 // User komplett löschen (inkl. Fänge, Lizenzen, Notifications)
-router.delete('/fishers/:id', async (req, res) => {
+router.delete('/fishers/:id', adminOnly, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -625,6 +641,94 @@ router.delete('/fishers/:id', async (req, res) => {
   } catch (err) {
     console.error('Delete fisher error:', err);
     res.status(500).json({ error: 'Fehler beim Löschen: ' + err.message });
+  }
+});
+
+// ── PUT /api/admin/fishers/:id/role ───────────────────────────
+// Rolle ändern (admin kann kontrolleur vergeben/entziehen)
+router.put('/fishers/:id/role', adminOnly, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!['fischer', 'kontrolleur'].includes(role)) {
+      return res.status(400).json({ error: 'Ungültige Rolle. Erlaubt: fischer, kontrolleur.' });
+    }
+
+    const { rows } = await pool.query('SELECT id, role, first_name, last_name FROM users WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Fischer nicht gefunden.' });
+    if (rows[0].role === 'admin') return res.status(403).json({ error: 'Admin-Rolle kann nicht geändert werden.' });
+
+    await pool.query('UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2', [role, id]);
+
+    console.log(`[Admin] Rolle geändert für: ${rows[0].first_name} ${rows[0].last_name} → ${role}`);
+    res.json({ message: `Rolle für "${rows[0].first_name} ${rows[0].last_name}" auf "${role}" geändert.` });
+  } catch (err) {
+    console.error('Change role error:', err);
+    res.status(500).json({ error: 'Fehler beim Ändern der Rolle.' });
+  }
+});
+
+// ── GET /api/admin/am-wasser ─────────────────────────────────
+// Wer ist gerade am Wasser? (Online-Status + aktiver Fischtag)
+router.get('/am-wasser', adminOrKontrolleur, async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+
+    const { rows } = await pool.query(`
+      SELECT
+        u.id, u.first_name, u.last_name, u.email, u.fisher_card_nr,
+        u.last_seen,
+        fd.id AS fishing_day_id,
+        fd.fishing_date,
+        fd.technique,
+        fd.notes AS day_notes,
+        fd.completed AS day_completed,
+        fd.created_at AS day_started,
+        (SELECT COUNT(*) FROM catches c WHERE c.fishing_day_id = fd.id)::int AS catch_count,
+        -- Letzter Fang-Standort des heutigen Fischtags
+        (SELECT latitude FROM catches c WHERE c.fishing_day_id = fd.id AND c.latitude IS NOT NULL ORDER BY c.created_at DESC LIMIT 1) AS last_lat,
+        (SELECT longitude FROM catches c WHERE c.fishing_day_id = fd.id AND c.longitude IS NOT NULL ORDER BY c.created_at DESC LIMIT 1) AS last_lng,
+        (SELECT location_name FROM catches c WHERE c.fishing_day_id = fd.id AND c.location_name IS NOT NULL ORDER BY c.created_at DESC LIMIT 1) AS last_location
+      FROM users u
+      LEFT JOIN fishing_days fd ON fd.user_id = u.id AND fd.fishing_date = $1 AND fd.completed = false
+      WHERE u.role != 'admin'
+      ORDER BY
+        fd.id IS NOT NULL DESC,
+        u.last_seen DESC NULLS LAST,
+        u.last_name, u.first_name
+    `, [today]);
+
+    // Online = last_seen innerhalb der letzten 5 Minuten
+    const ONLINE_THRESHOLD = 5 * 60 * 1000;
+    const now = Date.now();
+
+    res.json(rows.map(r => ({
+      id: r.id,
+      firstName: r.first_name,
+      lastName: r.last_name,
+      email: r.email,
+      fisherCardNr: r.fisher_card_nr,
+      online: r.last_seen ? (now - new Date(r.last_seen).getTime()) < ONLINE_THRESHOLD : false,
+      lastSeen: r.last_seen,
+      fishingDay: r.fishing_day_id ? {
+        id: r.fishing_day_id,
+        date: r.fishing_date,
+        technique: r.technique,
+        notes: r.day_notes,
+        completed: r.day_completed,
+        startedAt: r.day_started,
+        catchCount: r.catch_count,
+        lastPosition: r.last_lat ? {
+          latitude: parseFloat(r.last_lat),
+          longitude: parseFloat(r.last_lng),
+          locationName: r.last_location,
+        } : null,
+      } : null,
+    })));
+  } catch (err) {
+    console.error('Am-Wasser error:', err);
+    res.status(500).json({ error: 'Fehler beim Laden der Übersicht.' });
   }
 });
 
