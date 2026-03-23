@@ -143,6 +143,7 @@ export default function Profile() {
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName, setEditLastName] = useState('');
   const [editEmail, setEditEmail] = useState('');
+  const [editFisherCardNr, setEditFisherCardNr] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState(null);
   const [profileErr, setProfileErr] = useState(null);
@@ -202,6 +203,7 @@ export default function Profile() {
     setEditFirstName(user?.firstName || '');
     setEditLastName(user?.lastName || '');
     setEditEmail(user?.email || '');
+    setEditFisherCardNr(user?.fisherCardNr || '');
     setProfileMsg(null);
     setProfileErr(null);
     setEditMode(true);
@@ -223,6 +225,7 @@ export default function Profile() {
         firstName: editFirstName.trim(),
         lastName: editLastName.trim(),
         email: editEmail.trim(),
+        fisherCardNr: editFisherCardNr.trim(),
       });
       setProfileMsg(data.message);
       setEditMode(false);
@@ -334,6 +337,16 @@ export default function Profile() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fischerkarten-Nr.</label>
+              <input
+                type="text"
+                value={editFisherCardNr}
+                onChange={(e) => setEditFisherCardNr(e.target.value)}
+                placeholder="z.B. 12345"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+              />
+            </div>
 
             {profileErr && (
               <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{profileErr}</p>
@@ -371,12 +384,10 @@ export default function Profile() {
                 <span className="text-gray-500">E-Mail</span>
                 <p className="font-medium text-gray-900">{user?.email}</p>
               </div>
-              {user?.fisherCardNr && (
-                <div>
-                  <span className="text-gray-500">Fischerkarten-Nr.</span>
-                  <p className="font-medium text-gray-900">{user.fisherCardNr}</p>
-                </div>
-              )}
+              <div>
+                <span className="text-gray-500">Fischerkarten-Nr.</span>
+                <p className="font-medium text-gray-900">{user?.fisherCardNr || <span className="text-gray-400 italic">Nicht hinterlegt</span>}</p>
+              </div>
               <div>
                 <span className="text-gray-500">Rolle</span>
                 <p className="font-medium text-gray-900 capitalize">{user?.role}</p>

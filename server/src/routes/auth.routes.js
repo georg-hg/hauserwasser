@@ -237,7 +237,7 @@ router.put('/password', auth, async (req, res) => {
 // Profildaten ändern (Self-Service: Name, E-Mail)
 router.put('/profile', auth, async (req, res) => {
   try {
-    const { firstName, lastName, email } = req.body;
+    const { firstName, lastName, email, fisherCardNr } = req.body;
 
     if (!firstName || !lastName || !email) {
       return res.status(400).json({ error: 'Vorname, Nachname und E-Mail sind Pflichtfelder.' });
@@ -256,14 +256,14 @@ router.put('/profile', auth, async (req, res) => {
     }
 
     await pool.query(
-      `UPDATE users SET first_name = $1, last_name = $2, email = $3, updated_at = NOW()
-       WHERE id = $4`,
-      [firstName.trim(), lastName.trim(), email.toLowerCase().trim(), req.user.id]
+      `UPDATE users SET first_name = $1, last_name = $2, email = $3, fisher_card_nr = $4, updated_at = NOW()
+       WHERE id = $5`,
+      [firstName.trim(), lastName.trim(), email.toLowerCase().trim(), fisherCardNr?.trim() || null, req.user.id]
     );
 
     res.json({
       message: 'Profil aktualisiert.',
-      user: { firstName: firstName.trim(), lastName: lastName.trim(), email: email.toLowerCase().trim() },
+      user: { firstName: firstName.trim(), lastName: lastName.trim(), email: email.toLowerCase().trim(), fisherCardNr: fisherCardNr?.trim() || null },
     });
   } catch (err) {
     console.error('Profile update error:', err);
