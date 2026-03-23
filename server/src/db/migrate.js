@@ -16,8 +16,8 @@ const SCHEMA = `
     fisher_card_nr  VARCHAR(50),
     license_valid_from DATE,
     license_valid_to   DATE,
-    role            VARCHAR(20) DEFAULT 'fisher'
-                    CHECK (role IN ('fisher', 'admin', 'warden')),
+    role            VARCHAR(20) DEFAULT 'fischer'
+                    CHECK (role IN ('fischer', 'admin', 'kontrolleur')),
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     updated_at      TIMESTAMPTZ DEFAULT NOW()
   );

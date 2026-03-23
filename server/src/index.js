@@ -154,6 +154,32 @@ async function autoMigrate() {
         ON predator_sightings(sighted_at DESC);
     `);
 
+    // Role-CHECK-Constraint aktualisieren (fischer/kontrolleur statt fisher/warden)
+    await pool.query(`
+      DO $$ BEGIN
+        -- Alten CHECK-Constraint entfernen (Name kann variieren)
+        DECLARE
+          constraint_name TEXT;
+        BEGIN
+          SELECT con.conname INTO constraint_name
+          FROM pg_constraint con
+          JOIN pg_class rel ON rel.oid = con.conrelid
+          JOIN pg_attribute att ON att.attrelid = rel.oid AND att.attnum = ANY(con.conkey)
+          WHERE rel.relname = 'users' AND att.attname = 'role' AND con.contype = 'c';
+
+          IF constraint_name IS NOT NULL THEN
+            EXECUTE 'ALTER TABLE users DROP CONSTRAINT ' || constraint_name;
+            ALTER TABLE users ADD CONSTRAINT users_role_check
+              CHECK (role IN ('fischer', 'admin', 'kontrolleur'));
+          END IF;
+        END;
+
+        -- Bestehende Werte migrieren
+        UPDATE users SET role = 'fischer' WHERE role = 'fisher';
+        UPDATE users SET role = 'kontrolleur' WHERE role = 'warden';
+      END $$;
+    `);
+
     // last_seen für Online-Status
     await pool.query(`
       DO $$ BEGIN
