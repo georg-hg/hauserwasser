@@ -18,7 +18,7 @@ const VORKOMMEN_BADGE = {
 
 // ── Besatz-Daten (statisch) ──
 const BESATZ_PLAN = {
-  datum: '11.04.2026',
+  datum: '10.04.2026',
   status: 'geplant',
   fische: [
     { art: 'Regenbogenforelle', menge_kg: 120 },
@@ -49,7 +49,7 @@ function BesatzSection() {
   const staticMapUrlHD = `${API_URL}/api/revier/static-map?size=1280x1024&scale=2&maptype=satellite&${markersParams}`;
 
   // Google Maps Embed mit allen Stellen als Wegpunkte
-  const daysUntil = Math.ceil((new Date('2026-04-11') - new Date()) / (1000 * 60 * 60 * 24));
+  const daysUntil = Math.ceil((new Date('2026-04-10') - new Date()) / (1000 * 60 * 60 * 24));
   const isPast = daysUntil < 0;
 
   return (
