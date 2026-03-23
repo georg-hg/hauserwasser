@@ -164,9 +164,21 @@ export default function WaterWidget() {
         Gewässerdaten Krems
       </h2>
 
-      {/* Trend-Übersicht (kombiniert beide Stationen) */}
+      {/* Aktuelle Stationsdaten */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <StationTile
+          station={data?.kremsmuenster}
+          name="Kremsmünster"
+        />
+        <StationTile
+          station={data?.kremsdorf}
+          name="Kremsdorf"
+        />
+      </div>
+
+      {/* 30-Tage-Trend (unterhalb der Stationen) */}
       {hasTrends && (
-        <div className="card p-4 mb-3">
+        <div className="card p-4 mt-3">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-gray-800 text-sm">30-Tage-Trend</h3>
             <span className="text-[10px] text-gray-400">{trends.dataPoints} Tage Daten</span>
@@ -176,7 +188,6 @@ export default function WaterWidget() {
             <TrendBadge direction={trends.trends.durchfluss.direction} label="Durchfluss" />
             <TrendBadge direction={trends.trends.temperatur.direction} label="Temperatur" />
           </div>
-          {/* Mini-Sparklines */}
           {trends.history?.length > 2 && (
             <div className="mt-3 space-y-1.5">
               <div>
@@ -195,18 +206,6 @@ export default function WaterWidget() {
           )}
         </div>
       )}
-
-      {/* Aktuelle Stationsdaten */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <StationTile
-          station={data?.kremsmuenster}
-          name="Kremsmünster"
-        />
-        <StationTile
-          station={data?.kremsdorf}
-          name="Kremsdorf"
-        />
-      </div>
     </div>
   );
 }

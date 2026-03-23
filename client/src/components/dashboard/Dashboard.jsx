@@ -57,6 +57,9 @@ export default function Dashboard() {
       {/* Sedimentmonitoring Krems (Trübe + Schwebstoff + Trend) */}
       <MonitoringWidget />
 
+      {/* Wetter Piberbach (aktuell + 3 Tage) */}
+      <WeatherWidget />
+
       {/* Karte mit allen Faengen */}
       <div className="card p-0 overflow-hidden relative">
         <div className="p-4 pb-2 flex items-center justify-between">
@@ -109,9 +112,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
-      {/* Wetter Piberbach (aktuell + 3 Tage) */}
-      <WeatherWidget />
 
       {/* Letzte Faenge */}
       {catches.length > 0 && (
