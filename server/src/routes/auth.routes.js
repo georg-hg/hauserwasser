@@ -233,6 +233,44 @@ router.put('/password', auth, async (req, res) => {
   }
 });
 
+// ── PUT /api/auth/profile ─────────────────────────────────
+// Profildaten ändern (Self-Service: Name, E-Mail)
+router.put('/profile', auth, async (req, res) => {
+  try {
+    const { firstName, lastName, email } = req.body;
+
+    if (!firstName || !lastName || !email) {
+      return res.status(400).json({ error: 'Vorname, Nachname und E-Mail sind Pflichtfelder.' });
+    }
+    if (!email.includes('@')) {
+      return res.status(400).json({ error: 'Bitte eine gültige E-Mail-Adresse eingeben.' });
+    }
+
+    // Prüfen ob neue E-Mail schon vergeben (von jemand anderem)
+    const existing = await pool.query(
+      'SELECT id FROM users WHERE email = $1 AND id != $2',
+      [email.toLowerCase(), req.user.id]
+    );
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'Diese E-Mail-Adresse ist bereits vergeben.' });
+    }
+
+    await pool.query(
+      `UPDATE users SET first_name = $1, last_name = $2, email = $3, updated_at = NOW()
+       WHERE id = $4`,
+      [firstName.trim(), lastName.trim(), email.toLowerCase().trim(), req.user.id]
+    );
+
+    res.json({
+      message: 'Profil aktualisiert.',
+      user: { firstName: firstName.trim(), lastName: lastName.trim(), email: email.toLowerCase().trim() },
+    });
+  } catch (err) {
+    console.error('Profile update error:', err);
+    res.status(500).json({ error: 'Profilaktualisierung fehlgeschlagen.' });
+  }
+});
+
 // ── GET /api/auth/license ────────────────────────────────────
 // Aktuelle Lizenz-Info für eingeloggten User
 router.get('/license', auth, async (req, res) => {

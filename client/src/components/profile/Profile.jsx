@@ -138,6 +138,15 @@ export default function Profile() {
   const [cardFullscreen, setCardFullscreen] = useState(false);
   const cardInputRef = useRef(null);
 
+  // Profil-Edit
+  const [editMode, setEditMode] = useState(false);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMsg, setProfileMsg] = useState(null);
+  const [profileErr, setProfileErr] = useState(null);
+
   // Passwort-Form
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -189,6 +198,42 @@ export default function Profile() {
     }
   };
 
+  const startEdit = () => {
+    setEditFirstName(user?.firstName || '');
+    setEditLastName(user?.lastName || '');
+    setEditEmail(user?.email || '');
+    setProfileMsg(null);
+    setProfileErr(null);
+    setEditMode(true);
+  };
+
+  const handleProfileSave = async (e) => {
+    e.preventDefault();
+    setProfileMsg(null);
+    setProfileErr(null);
+
+    if (!editFirstName.trim() || !editLastName.trim() || !editEmail.trim()) {
+      setProfileErr('Alle Felder sind Pflichtfelder.');
+      return;
+    }
+
+    setProfileSaving(true);
+    try {
+      const data = await api.put('/api/auth/profile', {
+        firstName: editFirstName.trim(),
+        lastName: editLastName.trim(),
+        email: editEmail.trim(),
+      });
+      setProfileMsg(data.message);
+      setEditMode(false);
+      if (refreshUser) refreshUser();
+    } catch (err) {
+      setProfileErr(err.message);
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     setPwMessage(null);
@@ -227,7 +272,7 @@ export default function Profile() {
       <h1 className="text-2xl font-bold text-gray-900">Mein Profil</h1>
 
       {/* Hinweis: Fischerkarte fehlt */}
-      {!cardUrl && user?.role !== 'admin' && (
+      {!cardUrl && !['admin', 'kontrolleur'].includes(user?.role) && (
         <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-200">
           <svg className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -243,30 +288,106 @@ export default function Profile() {
 
       {/* Persönliche Daten */}
       <section className="bg-white rounded-xl shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">Persönliche Daten</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-gray-500">Name</span>
-            <p className="font-medium text-gray-900">{user?.firstName} {user?.lastName}</p>
-          </div>
-          <div>
-            <span className="text-gray-500">E-Mail</span>
-            <p className="font-medium text-gray-900">{user?.email}</p>
-          </div>
-          {user?.fisherCardNr && (
-            <div>
-              <span className="text-gray-500">Fischerkarten-Nr.</span>
-              <p className="font-medium text-gray-900">{user.fisherCardNr}</p>
-            </div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-800">Persönliche Daten</h2>
+          {!editMode && (
+            <button
+              onClick={startEdit}
+              className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+            >
+              Bearbeiten
+            </button>
           )}
-          <div>
-            <span className="text-gray-500">Rolle</span>
-            <p className="font-medium text-gray-900 capitalize">{user?.role}</p>
-          </div>
         </div>
+
+        {editMode ? (
+          <form onSubmit={handleProfileSave} className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Vorname</label>
+                <input
+                  type="text"
+                  value={editFirstName}
+                  onChange={(e) => setEditFirstName(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nachname</label>
+                <input
+                  type="text"
+                  value={editLastName}
+                  onChange={(e) => setEditLastName(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
+              <input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+              />
+            </div>
+
+            {profileErr && (
+              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{profileErr}</p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={profileSaving}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700
+                           disabled:opacity-50 transition-colors text-sm font-medium"
+              >
+                {profileSaving ? 'Speichern...' : 'Speichern'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditMode(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            {profileMsg && (
+              <p className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg mb-3">{profileMsg}</p>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-500">Name</span>
+                <p className="font-medium text-gray-900">{user?.firstName} {user?.lastName}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">E-Mail</span>
+                <p className="font-medium text-gray-900">{user?.email}</p>
+              </div>
+              {user?.fisherCardNr && (
+                <div>
+                  <span className="text-gray-500">Fischerkarten-Nr.</span>
+                  <p className="font-medium text-gray-900">{user.fisherCardNr}</p>
+                </div>
+              )}
+              <div>
+                <span className="text-gray-500">Rolle</span>
+                <p className="font-medium text-gray-900 capitalize">{user?.role}</p>
+              </div>
+            </div>
+          </>
+        )}
       </section>
 
-      {/* Fischereiberechtigung / Lizenz-Status */}
+      {/* Fischereiberechtigung / Lizenz-Status (nicht für Admin) */}
+      {user?.role !== 'admin' && (
       <section className="bg-white rounded-xl shadow-sm p-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Fischereiberechtigung</h2>
 
@@ -311,6 +432,7 @@ export default function Profile() {
           </div>
         )}
       </section>
+      )}
 
       {/* Fischerkarte Wallet */}
       <section className="bg-white rounded-xl shadow-sm p-6">
