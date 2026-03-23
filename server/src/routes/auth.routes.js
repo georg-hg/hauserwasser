@@ -158,6 +158,7 @@ router.post('/login', async (req, res) => {
         firstName: user.first_name,
         lastName: user.last_name,
         role: user.role,
+        isKontrolleur: user.is_kontrolleur || false,
         fisherCardUrl: user.fisher_card_url || null,
       },
     });
@@ -171,7 +172,7 @@ router.post('/login', async (req, res) => {
 router.get('/me', auth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, email, first_name, last_name, role, birth_date,
+      `SELECT id, email, first_name, last_name, role, is_kontrolleur, birth_date,
               fisher_card_nr, fisher_card_url, license_valid_from, license_valid_to
        FROM users WHERE id = $1`,
       [req.user.id]
@@ -188,6 +189,7 @@ router.get('/me', auth, async (req, res) => {
       firstName: u.first_name,
       lastName: u.last_name,
       role: u.role,
+      isKontrolleur: u.is_kontrolleur || false,
       birthDate: u.birth_date,
       fisherCardNr: u.fisher_card_nr,
       fisherCardUrl: u.fisher_card_url,

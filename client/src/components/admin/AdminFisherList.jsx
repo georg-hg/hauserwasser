@@ -1,4 +1,4 @@
-export default function AdminFisherList({ fishers, onToggleLicense, onToggleBlock, onDeleteFisher, onSelectFisher, onExportFisher, onResetPassword, onChangeEmail, onChangeRole, currentYear }) {
+export default function AdminFisherList({ fishers, onToggleLicense, onToggleBlock, onDeleteFisher, onSelectFisher, onExportFisher, onResetPassword, onChangeEmail, onToggleKontrolleur, currentYear }) {
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       {/* Desktop Table */}
@@ -28,7 +28,7 @@ export default function AdminFisherList({ fishers, onToggleLicense, onToggleBloc
                     <span className={`font-medium ${f.blocked ? 'text-red-700 line-through' : 'text-gray-900'}`}>
                       {f.lastName} {f.firstName}
                     </span>
-                    {f.role === 'kontrolleur' && (
+                    {f.isKontrolleur && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
                         Kontrolleur
                       </span>
@@ -83,11 +83,11 @@ export default function AdminFisherList({ fishers, onToggleLicense, onToggleBloc
                       Fangbuch
                     </button>
                     <button
-                      onClick={() => onChangeRole(f)}
+                      onClick={() => onToggleKontrolleur(f)}
                       className="text-purple-600 hover:text-purple-800 text-xs font-medium"
-                      title={f.role === 'kontrolleur' ? 'Zu Fischer zurückstufen' : 'Zum Kontrolleur machen'}
+                      title={f.isKontrolleur ? 'Zu Fischer zurückstufen' : 'Zum Kontrolleur machen'}
                     >
-                      {f.role === 'kontrolleur' ? '→ Fischer' : '→ Kontrolleur'}
+                      {f.isKontrolleur ? '→ Fischer' : '→ Kontrolleur'}
                     </button>
                     <button
                       onClick={() => onResetPassword(f)}
@@ -136,7 +136,7 @@ export default function AdminFisherList({ fishers, onToggleLicense, onToggleBloc
                   <p className={`font-medium ${f.blocked ? 'text-red-700 line-through' : 'text-gray-900'}`}>
                     {f.lastName} {f.firstName}
                   </p>
-                  {f.role === 'kontrolleur' && (
+                  {f.isKontrolleur && (
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
                       Kontrolleur
                     </span>
@@ -178,8 +178,8 @@ export default function AdminFisherList({ fishers, onToggleLicense, onToggleBloc
               <button onClick={() => onSelectFisher(f)} className="text-primary-600 text-xs font-medium">
                 Fangbuch
               </button>
-              <button onClick={() => onChangeRole(f)} className="text-purple-600 text-xs font-medium">
-                {f.role === 'kontrolleur' ? '→ Fischer' : '→ Kontrolleur'}
+              <button onClick={() => onToggleKontrolleur(f)} className="text-purple-600 text-xs font-medium">
+                {f.isKontrolleur ? '→ Fischer' : '→ Kontrolleur'}
               </button>
               <button onClick={() => onResetPassword(f)} className="text-amber-600 text-xs font-medium">
                 Passwort

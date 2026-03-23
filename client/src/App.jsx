@@ -41,7 +41,7 @@ function AdminRoute({ children }) {
     );
   }
   if (!user) return <Navigate to="/login" />;
-  if (!['admin', 'kontrolleur'].includes(user.role)) return <Navigate to="/" />;
+  if (user.role !== 'admin' && !user.isKontrolleur) return <Navigate to="/" />;
   return children;
 }
 
@@ -70,7 +70,7 @@ export default function App() {
           {/* App — Fischer ohne Karte → Profil */}
           <Route path="/" element={
             <ProtectedRoute>
-              {user && !['admin', 'kontrolleur'].includes(user.role) && !user.fisherCardUrl
+              {user && user.role !== 'admin' && !user.isKontrolleur && !user.fisherCardUrl
                 ? <Navigate to="/profil" />
                 : <Dashboard />}
             </ProtectedRoute>

@@ -21,7 +21,7 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isAdmin = user?.role === 'admin';
-  const isKontrolleur = user?.role === 'kontrolleur';
+  const isKontrolleur = user?.isKontrolleur || false;
   const showAdmin = isAdmin || isKontrolleur;
   const adminItems = showAdmin
     ? ADMIN_ITEMS.filter(item => !item.adminOnly || isAdmin)

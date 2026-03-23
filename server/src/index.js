@@ -154,26 +154,15 @@ async function autoMigrate() {
         ON predator_sightings(sighted_at DESC);
     `);
 
-    // Role-CHECK-Constraint aktualisieren (fischer/kontrolleur statt fisher/warden)
+    // is_kontrolleur Flag auf users
     await pool.query(`
-      DO $$
-      DECLARE
-        v_constraint TEXT;
-      BEGIN
-        SELECT con.conname INTO v_constraint
-        FROM pg_constraint con
-        JOIN pg_class rel ON rel.oid = con.conrelid
-        JOIN pg_attribute att ON att.attrelid = rel.oid AND att.attnum = ANY(con.conkey)
-        WHERE rel.relname = 'users' AND att.attname = 'role' AND con.contype = 'c';
-
-        IF v_constraint IS NOT NULL THEN
-          EXECUTE 'ALTER TABLE users DROP CONSTRAINT ' || quote_ident(v_constraint);
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'users' AND column_name = 'is_kontrolleur'
+        ) THEN
+          ALTER TABLE users ADD COLUMN is_kontrolleur BOOLEAN DEFAULT false;
         END IF;
-
-        EXECUTE 'ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN (''fischer'', ''admin'', ''kontrolleur''))';
-
-        UPDATE users SET role = 'fischer' WHERE role = 'fisher';
-        UPDATE users SET role = 'kontrolleur' WHERE role = 'warden';
       END $$;
     `);
 

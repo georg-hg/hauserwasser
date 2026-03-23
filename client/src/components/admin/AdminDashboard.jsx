@@ -18,9 +18,11 @@ export default function AdminDashboard() {
   const { user } = useAuth();
   const userRole = user?.role || 'fischer';
   const isAdmin = userRole === 'admin';
+  const isKontrolleur = user?.isKontrolleur || false;
 
   // Tabs basierend auf Rolle filtern
-  const tabs = Object.values(TAB_DEFS).filter(t => t.roles.includes(userRole));
+  const effectiveRoles = [userRole, ...(isKontrolleur ? ['kontrolleur'] : [])];
+  const tabs = Object.values(TAB_DEFS).filter(t => t.roles.some(r => effectiveRoles.includes(r)));
 
   const [activeTab, setActiveTab] = useState(tabs[0]?.id || 'statistik');
   const [fishers, setFishers] = useState([]);
@@ -138,15 +140,14 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleChangeRole = async (fisher) => {
-    const newRole = fisher.role === 'kontrolleur' ? 'fischer' : 'kontrolleur';
-    const label = newRole === 'kontrolleur' ? 'Kontrolleur' : 'Fischer';
+  const handleToggleKontrolleur = async (fisher) => {
+    const label = fisher.isKontrolleur ? 'Fischer' : 'Kontrolleur';
     const confirmed = confirm(
-      `Rolle für "${fisher.lastName} ${fisher.firstName}" auf "${label}" ändern?`
+      `"${fisher.lastName} ${fisher.firstName}" zum ${label} machen?`
     );
     if (!confirmed) return;
     try {
-      const result = await api.put(`/api/admin/fishers/${fisher.id}/role`, { role: newRole });
+      const result = await api.put(`/api/admin/fishers/${fisher.id}/kontrolleur`);
       alert(result.message);
       loadFishers();
     } catch (err) {
@@ -211,7 +212,7 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {isAdmin ? 'Admin-Bereich' : 'Kontrolleur'}
+            {isAdmin ? 'Admin-Bereich' : isKontrolleur ? 'Kontrolleur' : 'Übersicht'}
           </h1>
           <p className="text-gray-500 text-sm mt-1">
             Saison {currentYear}
@@ -277,7 +278,7 @@ export default function AdminDashboard() {
           onExportFisher={(fisher) => handleExport(fisher.id)}
           onResetPassword={handleResetPassword}
           onChangeEmail={handleChangeEmail}
-          onChangeRole={handleChangeRole}
+          onToggleKontrolleur={handleToggleKontrolleur}
           currentYear={currentYear}
         />
       )}

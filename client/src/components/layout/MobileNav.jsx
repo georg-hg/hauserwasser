@@ -18,7 +18,7 @@ export default function MobileNav() {
   const location = useLocation();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const isKontrolleur = user?.role === 'kontrolleur';
+  const isKontrolleur = user?.isKontrolleur || false;
   // Admins: alle Tabs + Revier + Admin; Kontrolleur: Fischer-Tabs + Admin; Fischer: nur Fischer-Tabs
   const TABS = isAdmin
     ? [...FISHER_TABS.slice(0, 3), REVIER_TAB, ADMIN_TAB]

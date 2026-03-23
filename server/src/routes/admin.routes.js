@@ -9,12 +9,15 @@ const router = express.Router();
 // Basis-Auth für alle Admin-Routen
 router.use(auth);
 
-// Middleware: Admin oder Kontrolleur
-function adminOrKontrolleur(req, res, next) {
-  if (!req.user || !['admin', 'kontrolleur'].includes(req.user.role)) {
-    return res.status(403).json({ error: 'Keine Berechtigung.' });
-  }
-  next();
+// Middleware: Admin oder Kontrolleur (async DB-Check)
+async function adminOrKontrolleur(req, res, next) {
+  if (!req.user) return res.status(403).json({ error: 'Keine Berechtigung.' });
+  if (req.user.role === 'admin') return next();
+  try {
+    const { rows } = await pool.query('SELECT is_kontrolleur FROM users WHERE id = $1', [req.user.id]);
+    if (rows[0]?.is_kontrolleur) return next();
+  } catch (e) { /* ignore */ }
+  return res.status(403).json({ error: 'Keine Berechtigung.' });
 }
 
 // Middleware: Nur Admin
@@ -31,6 +34,7 @@ router.get('/fishers', adminOnly, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT u.id, u.email, u.first_name, u.last_name, u.role,
+             u.is_kontrolleur,
              u.fisher_card_nr, u.birth_date, u.created_at,
              u.blocked, u.blocked_at, u.blocked_reason,
              l.id AS license_id, l.season_year, l.activated_at, l.revoked_at,
@@ -48,6 +52,7 @@ router.get('/fishers', adminOnly, async (req, res) => {
       firstName: r.first_name,
       lastName: r.last_name,
       role: r.role,
+      isKontrolleur: r.is_kontrolleur || false,
       fisherCardNr: r.fisher_card_nr,
       birthDate: r.birth_date,
       createdAt: r.created_at,
@@ -644,28 +649,25 @@ router.delete('/fishers/:id', adminOnly, async (req, res) => {
   }
 });
 
-// ── PUT /api/admin/fishers/:id/role ───────────────────────────
-// Rolle ändern (admin kann kontrolleur vergeben/entziehen)
-router.put('/fishers/:id/role', adminOnly, async (req, res) => {
+// ── PUT /api/admin/fishers/:id/kontrolleur ───────────────────
+// Kontrolleur-Flag toggeln
+router.put('/fishers/:id/kontrolleur', adminOnly, async (req, res) => {
   try {
     const { id } = req.params;
-    const { role } = req.body;
 
-    if (!['fischer', 'kontrolleur'].includes(role)) {
-      return res.status(400).json({ error: 'Ungültige Rolle. Erlaubt: fischer, kontrolleur.' });
-    }
-
-    const { rows } = await pool.query('SELECT id, role, first_name, last_name FROM users WHERE id = $1', [id]);
+    const { rows } = await pool.query('SELECT id, role, is_kontrolleur, first_name, last_name FROM users WHERE id = $1', [id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Fischer nicht gefunden.' });
-    if (rows[0].role === 'admin') return res.status(403).json({ error: 'Admin-Rolle kann nicht geändert werden.' });
+    if (rows[0].role === 'admin') return res.status(403).json({ error: 'Admin kann nicht geändert werden.' });
 
-    await pool.query('UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2', [role, id]);
+    const newValue = !rows[0].is_kontrolleur;
+    await pool.query('UPDATE users SET is_kontrolleur = $1, updated_at = NOW() WHERE id = $2', [newValue, id]);
 
-    console.log(`[Admin] Rolle geändert für: ${rows[0].first_name} ${rows[0].last_name} → ${role}`);
-    res.json({ message: `Rolle für "${rows[0].first_name} ${rows[0].last_name}" auf "${role}" geändert.` });
+    const label = newValue ? 'Kontrolleur' : 'Fischer';
+    console.log(`[Admin] Kontrolleur-Flag geändert für: ${rows[0].first_name} ${rows[0].last_name} → ${label}`);
+    res.json({ message: `"${rows[0].first_name} ${rows[0].last_name}" ist jetzt ${label}.` });
   } catch (err) {
-    console.error('Change role error:', err);
-    res.status(500).json({ error: 'Fehler beim Ändern der Rolle.' });
+    console.error('Toggle kontrolleur error:', err);
+    res.status(500).json({ error: 'Fehler beim Ändern des Kontrolleur-Status.' });
   }
 });
 
