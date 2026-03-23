@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const pool = require('../config/db');
 
 // Riverapp Station-IDs
 const STATIONS = {
@@ -339,5 +340,133 @@ function extractSnippet(html, pattern, around) {
   const end = Math.min(html.length, m.index + m[0].length + around);
   return html.substring(start, end);
 }
+
+// ── Periodisches Logging (stündlich) ─────────────────────────
+async function logWaterData() {
+  try {
+    const [kremsmuenster, kremsdorf] = await Promise.all([
+      fetchStation(STATIONS.kremsmuenster),
+      fetchStation(STATIONS.kremsdorf),
+    ]);
+
+    const entries = [
+      { station: 'kremsmuenster', data: kremsmuenster },
+      { station: 'kremsdorf', data: kremsdorf },
+    ];
+
+    for (const { station, data } of entries) {
+      if (!data.pegel && !data.durchfluss && !data.temperatur) continue;
+      await pool.query(
+        `INSERT INTO water_history (station, pegel, durchfluss, temperatur)
+         VALUES ($1, $2, $3, $4)`,
+        [
+          station,
+          data.pegel?.value || null,
+          data.durchfluss?.value || null,
+          data.temperatur?.value || null,
+        ]
+      );
+    }
+    console.log('[Water] Historische Daten geloggt.');
+  } catch (err) {
+    console.error('[Water] Logging-Fehler:', err.message);
+  }
+}
+
+// Logging alle 60 Min starten (nach 10s Delay für DB-Ready)
+setTimeout(() => {
+  logWaterData(); // sofort beim Start einmal loggen
+  setInterval(logWaterData, 60 * 60 * 1000);
+}, 10000);
+
+// Alte Daten > 35 Tage aufräumen (einmal täglich)
+setTimeout(() => {
+  setInterval(async () => {
+    try {
+      await pool.query("DELETE FROM water_history WHERE recorded_at < NOW() - INTERVAL '35 days'");
+      console.log('[Water] Alte History-Daten bereinigt.');
+    } catch (e) { /* ignore */ }
+  }, 24 * 60 * 60 * 1000);
+}, 60000);
+
+// ── GET /api/water/trends – 30-Tage-Trend (kombiniert) ──────
+router.get('/trends', async (req, res) => {
+  try {
+    // Tagesdurchschnitte beider Stationen kombiniert, letzte 30 Tage
+    const { rows } = await pool.query(`
+      SELECT
+        DATE(recorded_at) AS day,
+        AVG(pegel) AS avg_pegel,
+        AVG(durchfluss) AS avg_durchfluss,
+        AVG(temperatur) AS avg_temperatur
+      FROM water_history
+      WHERE recorded_at >= NOW() - INTERVAL '30 days'
+        AND (pegel IS NOT NULL OR durchfluss IS NOT NULL OR temperatur IS NOT NULL)
+      GROUP BY DATE(recorded_at)
+      ORDER BY day
+    `);
+
+    // Trend berechnen: Vergleich letzter 3 Tage vs. vorherige 7 Tage
+    function calcTrend(data, field) {
+      if (data.length < 4) return 'stable';
+      const recent = data.slice(-3);
+      const previous = data.slice(-10, -3);
+      if (previous.length === 0) return 'stable';
+
+      const avgRecent = recent.reduce((s, d) => s + (parseFloat(d[field]) || 0), 0) / recent.length;
+      const avgPrevious = previous.reduce((s, d) => s + (parseFloat(d[field]) || 0), 0) / previous.length;
+
+      if (avgPrevious === 0) return 'stable';
+      const change = ((avgRecent - avgPrevious) / avgPrevious) * 100;
+
+      if (change > 5) return 'rising';
+      if (change < -5) return 'falling';
+      return 'stable';
+    }
+
+    // Aktuelle Werte (letzte Messung)
+    const { rows: latest } = await pool.query(`
+      SELECT
+        AVG(pegel) AS pegel,
+        AVG(durchfluss) AS durchfluss,
+        AVG(temperatur) AS temperatur
+      FROM water_history
+      WHERE recorded_at >= NOW() - INTERVAL '3 hours'
+        AND (pegel IS NOT NULL OR durchfluss IS NOT NULL OR temperatur IS NOT NULL)
+    `);
+
+    const current = latest[0] || {};
+
+    res.json({
+      trends: {
+        pegel: {
+          direction: calcTrend(rows, 'avg_pegel'),
+          current: current.pegel ? parseFloat(parseFloat(current.pegel).toFixed(1)) : null,
+          unit: 'cm',
+        },
+        durchfluss: {
+          direction: calcTrend(rows, 'avg_durchfluss'),
+          current: current.durchfluss ? parseFloat(parseFloat(current.durchfluss).toFixed(2)) : null,
+          unit: 'm³/s',
+        },
+        temperatur: {
+          direction: calcTrend(rows, 'avg_temperatur'),
+          current: current.temperatur ? parseFloat(parseFloat(current.temperatur).toFixed(1)) : null,
+          unit: '°C',
+        },
+      },
+      history: rows.map(r => ({
+        day: r.day,
+        pegel: r.avg_pegel ? parseFloat(parseFloat(r.avg_pegel).toFixed(1)) : null,
+        durchfluss: r.avg_durchfluss ? parseFloat(parseFloat(r.avg_durchfluss).toFixed(2)) : null,
+        temperatur: r.avg_temperatur ? parseFloat(parseFloat(r.avg_temperatur).toFixed(1)) : null,
+      })),
+      dataPoints: rows.length,
+    });
+  } catch (err) {
+    console.error('[Water] Trend error:', err);
+    res.status(500).json({ error: 'Trenddaten konnten nicht geladen werden.' });
+  }
+});
 
 module.exports = router;

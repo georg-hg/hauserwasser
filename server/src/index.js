@@ -166,6 +166,20 @@ async function autoMigrate() {
       END $$;
     `);
 
+    // Gewässerdaten-History (30-Tage-Trend)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS water_history (
+        id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        station         VARCHAR(50) NOT NULL,
+        pegel           DECIMAL(8,2),
+        durchfluss      DECIMAL(10,3),
+        temperatur      DECIMAL(5,2),
+        recorded_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_water_history_station_time
+        ON water_history(station, recorded_at DESC);
+    `);
+
     // last_seen für Online-Status
     await pool.query(`
       DO $$ BEGIN
