@@ -687,10 +687,13 @@ router.get('/am-wasser', adminOrKontrolleur, async (req, res) => {
         fd.notes AS day_notes,
         fd.completed AS day_completed,
         fd.created_at AS day_started,
+        fd.latitude AS live_lat,
+        fd.longitude AS live_lng,
+        fd.position_updated_at,
         (SELECT COUNT(*) FROM catches c WHERE c.fishing_day_id = fd.id)::int AS catch_count,
-        -- Letzter Fang-Standort des heutigen Fischtags
-        (SELECT latitude FROM catches c WHERE c.fishing_day_id = fd.id AND c.latitude IS NOT NULL ORDER BY c.created_at DESC LIMIT 1) AS last_lat,
-        (SELECT longitude FROM catches c WHERE c.fishing_day_id = fd.id AND c.longitude IS NOT NULL ORDER BY c.created_at DESC LIMIT 1) AS last_lng,
+        -- Letzter Fang-Standort als Fallback
+        (SELECT latitude FROM catches c WHERE c.fishing_day_id = fd.id AND c.latitude IS NOT NULL ORDER BY c.created_at DESC LIMIT 1) AS catch_lat,
+        (SELECT longitude FROM catches c WHERE c.fishing_day_id = fd.id AND c.longitude IS NOT NULL ORDER BY c.created_at DESC LIMIT 1) AS catch_lng,
         (SELECT location_name FROM catches c WHERE c.fishing_day_id = fd.id AND c.location_name IS NOT NULL ORDER BY c.created_at DESC LIMIT 1) AS last_location
       FROM users u
       LEFT JOIN fishing_days fd ON fd.user_id = u.id AND fd.fishing_date = $1 AND fd.completed = false
@@ -705,29 +708,37 @@ router.get('/am-wasser', adminOrKontrolleur, async (req, res) => {
     const ONLINE_THRESHOLD = 5 * 60 * 1000;
     const now = Date.now();
 
-    res.json(rows.map(r => ({
-      id: r.id,
-      firstName: r.first_name,
-      lastName: r.last_name,
-      email: r.email,
-      fisherCardNr: r.fisher_card_nr,
-      online: r.last_seen ? (now - new Date(r.last_seen).getTime()) < ONLINE_THRESHOLD : false,
-      lastSeen: r.last_seen,
-      fishingDay: r.fishing_day_id ? {
-        id: r.fishing_day_id,
-        date: r.fishing_date,
-        technique: r.technique,
-        notes: r.day_notes,
-        completed: r.day_completed,
-        startedAt: r.day_started,
-        catchCount: r.catch_count,
-        lastPosition: r.last_lat ? {
-          latitude: parseFloat(r.last_lat),
-          longitude: parseFloat(r.last_lng),
-          locationName: r.last_location,
+    res.json(rows.map(r => {
+      // Live-GPS bevorzugen, Fang-Position als Fallback
+      const lat = r.live_lat || r.catch_lat;
+      const lng = r.live_lng || r.catch_lng;
+
+      return {
+        id: r.id,
+        firstName: r.first_name,
+        lastName: r.last_name,
+        email: r.email,
+        fisherCardNr: r.fisher_card_nr,
+        online: r.last_seen ? (now - new Date(r.last_seen).getTime()) < ONLINE_THRESHOLD : false,
+        lastSeen: r.last_seen,
+        fishingDay: r.fishing_day_id ? {
+          id: r.fishing_day_id,
+          date: r.fishing_date,
+          technique: r.technique,
+          notes: r.day_notes,
+          completed: r.day_completed,
+          startedAt: r.day_started,
+          catchCount: r.catch_count,
+          positionUpdatedAt: r.position_updated_at,
+          lastPosition: lat ? {
+            latitude: parseFloat(lat),
+            longitude: parseFloat(lng),
+            locationName: r.last_location,
+            isLive: !!r.live_lat,
+          } : null,
         } : null,
-      } : null,
-    })));
+      };
+    }));
   } catch (err) {
     console.error('Am-Wasser error:', err);
     res.status(500).json({ error: 'Fehler beim Laden der Übersicht.' });

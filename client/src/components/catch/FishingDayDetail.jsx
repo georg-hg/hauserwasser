@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useGeolocation } from '../../hooks/useGeolocation';
+import { useGpsTracking } from '../../hooks/useGpsTracking';
 import { FISH_SPECIES, TECHNIQUES, getSpeciesGerman } from '../../utils/fishSpecies';
 import { isInClosedSeason } from '../../utils/seasonCheck';
 import MapComponent from '../map/MapComponent';
@@ -363,6 +364,9 @@ export default function FishingDayDetail() {
       setLoading(false);
     }
   };
+
+  // GPS-Tracking: sendet Position alle 5 Minuten während Fischtag aktiv
+  useGpsTracking(day?.id, day?.completed);
 
   useEffect(() => { fetchDay(); }, [id]);
 

@@ -136,6 +136,36 @@ router.put('/:id/complete', auth, async (req, res) => {
   }
 });
 
+// ── PUT /api/fishing-days/:id/position ───────────────────
+// Live-GPS-Position aktualisieren (Client sendet alle 5 Min.)
+router.put('/:id/position', auth, async (req, res) => {
+  try {
+    const { latitude, longitude } = req.body;
+
+    if (latitude == null || longitude == null) {
+      return res.status(400).json({ error: 'Latitude und Longitude sind Pflichtfelder.' });
+    }
+
+    const { rows } = await pool.query(`
+      UPDATE fishing_days SET
+        latitude = $1,
+        longitude = $2,
+        position_updated_at = NOW()
+      WHERE id = $3 AND user_id = $4 AND completed = false
+      RETURNING id, latitude, longitude, position_updated_at
+    `, [parseFloat(latitude), parseFloat(longitude), req.params.id, req.user.id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Aktiver Fischtag nicht gefunden.' });
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('PUT /fishing-days/:id/position error:', err);
+    res.status(500).json({ error: 'Position konnte nicht aktualisiert werden.' });
+  }
+});
+
 // ── DELETE /api/fishing-days/:id ─────────────────────────
 // Fischtag löschen (inkl. aller zugehörigen Fänge)
 router.delete('/:id', auth, async (req, res) => {

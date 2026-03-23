@@ -113,6 +113,9 @@ function FisherMap({ fishers }) {
                           ? '🟢 Online'
                           : '🟡 Zuletzt aktiv ' + timeAgoShort(f.lastSeen)
                         }
+                        {f.fishingDay.lastPosition?.isLive && (
+                          <span className="ml-1 text-emerald-600 font-medium">• GPS Live</span>
+                        )}
                       </p>
                     </div>
                   </div>

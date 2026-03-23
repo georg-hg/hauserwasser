@@ -219,6 +219,20 @@ async function autoMigrate() {
       END $$;
     `);
 
+    // Live-GPS-Position auf fishing_days
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'fishing_days' AND column_name = 'latitude'
+        ) THEN
+          ALTER TABLE fishing_days ADD COLUMN latitude DECIMAL(10, 7);
+          ALTER TABLE fishing_days ADD COLUMN longitude DECIMAL(10, 7);
+          ALTER TABLE fishing_days ADD COLUMN position_updated_at TIMESTAMPTZ;
+        END IF;
+      END $$;
+    `);
+
     console.log('✓ Auto-Migration erfolgreich.');
   } catch (err) {
     console.error('⚠ Auto-Migration Fehler (nicht kritisch):', err.message);
