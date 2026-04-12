@@ -27,6 +27,22 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// Einmalige Migration catches.latitude/longitude nullable
+app.get('/api/fix-catches', async (req, res) => {
+  const results = {};
+  const run = async (label, sql) => {
+    try { await pool.query(sql); results[label] = 'ok'; }
+    catch (e) { results[label] = e.message; }
+  };
+  await run('latitude DROP NOT NULL',  `ALTER TABLE catches ALTER COLUMN latitude DROP NOT NULL`);
+  await run('longitude DROP NOT NULL', `ALTER TABLE catches ALTER COLUMN longitude DROP NOT NULL`);
+  const { rows } = await pool.query(`
+    SELECT column_name, is_nullable FROM information_schema.columns
+    WHERE table_name = 'catches' AND column_name IN ('latitude','longitude')
+  `).catch(() => ({ rows: [] }));
+  res.json({ ok: true, migrations: results, columns: rows });
+});
+
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, max: 200,
   message: { error: 'Zu viele Anfragen - bitte warte kurz.' },
@@ -66,30 +82,11 @@ async function autoMigrate() {
     await pool.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fishing_days' AND column_name='technique') THEN ALTER TABLE fishing_days ADD COLUMN technique VARCHAR(50); ALTER TABLE fishing_days ADD COLUMN notes TEXT; ALTER TABLE fishing_days ADD COLUMN completed BOOLEAN DEFAULT false; ALTER TABLE fishing_days ADD COLUMN created_at TIMESTAMPTZ DEFAULT NOW(); END IF; END $$;`);
     await pool.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='catches' AND column_name='fishing_day_id') THEN ALTER TABLE catches ADD COLUMN fishing_day_id UUID REFERENCES fishing_days(id) ON DELETE SET NULL; END IF; END $$;`);
     await pool.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fishing_days' AND column_name='latitude') THEN ALTER TABLE fishing_days ADD COLUMN latitude DECIMAL(10,7); ALTER TABLE fishing_days ADD COLUMN longitude DECIMAL(10,7); ALTER TABLE fishing_days ADD COLUMN position_updated_at TIMESTAMPTZ; END IF; END $$;`);
+    // catches latitude/longitude nullable
+    await pool.query(`DO $$ BEGIN ALTER TABLE catches ALTER COLUMN latitude DROP NOT NULL; EXCEPTION WHEN others THEN NULL; END $$;`);
+    await pool.query(`DO $$ BEGIN ALTER TABLE catches ALTER COLUMN longitude DROP NOT NULL; EXCEPTION WHEN others THEN NULL; END $$;`);
 
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS stockings (
-        id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        stocked_at            TIMESTAMPTZ,
-        planned_date          DATE,
-        season_year           INTEGER NOT NULL,
-        fish_species          VARCHAR(100) NOT NULL,
-        quantity_kg           DECIMAL(8,2),
-        quantity_count        INTEGER,
-        cost_eur              DECIMAL(10,2),
-        price_per_kg_override DECIMAL(8,2),
-        source                VARCHAR(255),
-        age_class             VARCHAR(50),
-        is_planned            BOOLEAN NOT NULL DEFAULT false,
-        notes                 TEXT,
-        created_by            UUID REFERENCES users(id) ON DELETE SET NULL,
-        updated_at            TIMESTAMPTZ,
-        created_at            TIMESTAMPTZ DEFAULT NOW()
-      );
-      CREATE INDEX IF NOT EXISTS idx_stockings_season
-        ON stockings(season_year, is_planned, stocked_at DESC);
-    `);
-
+    await pool.query(`CREATE TABLE IF NOT EXISTS stockings (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), stocked_at TIMESTAMPTZ, planned_date DATE, season_year INTEGER NOT NULL, fish_species VARCHAR(100) NOT NULL, quantity_kg DECIMAL(8,2), quantity_count INTEGER, cost_eur DECIMAL(10,2), price_per_kg_override DECIMAL(8,2), source VARCHAR(255), age_class VARCHAR(50), is_planned BOOLEAN NOT NULL DEFAULT false, notes TEXT, created_by UUID REFERENCES users(id) ON DELETE SET NULL, updated_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT NOW()); CREATE INDEX IF NOT EXISTS idx_stockings_season ON stockings(season_year, is_planned, stocked_at DESC);`);
     await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS cost_eur DECIMAL(10,2);`);
     await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS price_per_kg_override DECIMAL(8,2);`);
     await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS planned_date DATE;`);
