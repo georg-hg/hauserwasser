@@ -2,17 +2,14 @@ const express = require('express');
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
 const upload = require('../middleware/upload');
-const { checkQuota } = require('../services/quotaChecker');
 
 const router = express.Router();
 
-// ── GET /api/catches ───────────────────────────────────────
-// Alle Fänge des eingeloggten Users (mit Paging)
+// GET /api/catches
 router.get('/', auth, async (req, res) => {
   try {
     const { page = 1, limit = 50, season } = req.query;
     const offset = (page - 1) * limit;
-
     let query = `
       SELECT c.*, cs.german_name, cs.min_size_cm
       FROM catches c
@@ -20,23 +17,14 @@ router.get('/', auth, async (req, res) => {
       WHERE c.user_id = $1
     `;
     const params = [req.user.id];
-
     if (season) {
       query += ` AND EXTRACT(YEAR FROM c.catch_date) = $${params.length + 1}`;
       params.push(season);
     }
-
     query += ` ORDER BY c.catch_date DESC, c.catch_time DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(limit, offset);
-
     const { rows } = await pool.query(query, params);
-
-    // Gesamtzahl für Paging
-    const countResult = await pool.query(
-      'SELECT COUNT(*) FROM catches WHERE user_id = $1',
-      [req.user.id]
-    );
-
+    const countResult = await pool.query('SELECT COUNT(*) FROM catches WHERE user_id = $1', [req.user.id]);
     res.json({
       catches: rows,
       total: parseInt(countResult.rows[0].count),
@@ -45,72 +33,52 @@ router.get('/', auth, async (req, res) => {
     });
   } catch (err) {
     console.error('GET /catches error:', err);
-    res.status(500).json({ error: 'Fänge konnten nicht geladen werden.' });
+    res.status(500).json({ error: 'Faenge konnten nicht geladen werden.' });
   }
 });
 
-// ── GET /api/catches/stats ─────────────────────────────────
-// Statistiken: Fischtage, Quoten, Saisonübersicht
+// GET /api/catches/stats
 router.get('/stats', auth, async (req, res) => {
   try {
     const year = req.query.year || new Date().getFullYear();
-
-    // Fischtage diese Saison
     const fishingDays = await pool.query(
       'SELECT COUNT(*) FROM fishing_days WHERE user_id = $1 AND season_year = $2',
       [req.user.id, year]
     );
-
-    // Fischtage diese Woche
     const weekDays = await pool.query(
-      `SELECT COUNT(*) FROM fishing_days
-       WHERE user_id = $1 AND fishing_date >= date_trunc('week', CURRENT_DATE)`,
+      `SELECT COUNT(*) FROM fishing_days WHERE user_id = $1 AND fishing_date >= date_trunc('week', CURRENT_DATE)`,
       [req.user.id]
     );
-
-    // Salmoniden diese Saison (kept=true)
     const salmonids = await pool.query(
-      `SELECT COUNT(*) FROM catches
-       WHERE user_id = $1 AND kept = true
+      `SELECT COUNT(*) FROM catches WHERE user_id = $1 AND kept = true
        AND fish_species IN ('brown_trout', 'rainbow_trout', 'char', 'grayling')
        AND EXTRACT(YEAR FROM catch_date) = $2`,
       [req.user.id, year]
     );
-
-    // Hecht/Zander dieses Jahr
     const pikeZander = await pool.query(
       `SELECT fish_species, COUNT(*) as count FROM catches
-       WHERE user_id = $1 AND kept = true
-       AND fish_species IN ('pike', 'zander')
-       AND EXTRACT(YEAR FROM catch_date) = $2
-       GROUP BY fish_species`,
+       WHERE user_id = $1 AND kept = true AND fish_species IN ('pike', 'zander')
+       AND EXTRACT(YEAR FROM catch_date) = $2 GROUP BY fish_species`,
       [req.user.id, year]
     );
-
-    // Gesamtfänge
     const totalCatches = await pool.query(
       `SELECT COUNT(*) as total,
-              SUM(CASE WHEN kept THEN 1 ELSE 0 END) as kept,
-              SUM(CASE WHEN NOT kept THEN 1 ELSE 0 END) as released
+        SUM(CASE WHEN kept THEN 1 ELSE 0 END) as kept,
+        SUM(CASE WHEN NOT kept THEN 1 ELSE 0 END) as released
        FROM catches WHERE user_id = $1 AND EXTRACT(YEAR FROM catch_date) = $2`,
       [req.user.id, year]
     );
-
-    // Fänge pro Art
     const bySpecies = await pool.query(
       `SELECT c.fish_species, cs.german_name, COUNT(*) as count,
-              SUM(CASE WHEN c.kept THEN 1 ELSE 0 END) as kept
+        SUM(CASE WHEN c.kept THEN 1 ELSE 0 END) as kept
        FROM catches c
        LEFT JOIN closed_seasons cs ON cs.fish_species = c.fish_species
        WHERE c.user_id = $1 AND EXTRACT(YEAR FROM c.catch_date) = $2
-       GROUP BY c.fish_species, cs.german_name
-       ORDER BY count DESC`,
+       GROUP BY c.fish_species, cs.german_name ORDER BY count DESC`,
       [req.user.id, year]
     );
-
     const pikeCount = pikeZander.rows.find(r => r.fish_species === 'pike')?.count || 0;
     const zanderCount = pikeZander.rows.find(r => r.fish_species === 'zander')?.count || 0;
-
     res.json({
       season: year,
       fishingDays: {
@@ -136,9 +104,7 @@ router.get('/stats', auth, async (req, res) => {
   }
 });
 
-// ── POST /api/catches ──────────────────────────────────────
-// Neuen Fang eintragen
-// latitude/longitude sind optional – nicht jeder setzt einen Pin
+// POST /api/catches
 router.post('/', auth, upload.single('photo'), async (req, res) => {
   try {
     const {
@@ -148,22 +114,10 @@ router.post('/', auth, upload.single('photo'), async (req, res) => {
     } = req.body;
 
     if (!catchDate || !fishSpecies) {
-      return res.status(400).json({
-        error: 'Datum und Fischart sind Pflichtfelder.',
-      });
-    }
-
-    // Quotenprüfung
-    const quotaCheck = await checkQuota(req.user.id, fishSpecies, kept === 'true' || kept === true);
-    if (quotaCheck.exceeded) {
-      return res.status(422).json({
-        error: quotaCheck.message,
-        quotaInfo: quotaCheck,
-      });
+      return res.status(400).json({ error: 'Datum und Fischart sind Pflichtfelder.' });
     }
 
     const photoUrl = req.file ? `/uploads/${req.file.filename}` : null;
-
     const { rows } = await pool.query(
       `INSERT INTO catches (
         user_id, catch_date, catch_time, latitude, longitude, location_name,
@@ -176,10 +130,15 @@ router.post('/', auth, upload.single('photo'), async (req, res) => {
         latitude ? parseFloat(latitude) : null,
         longitude ? parseFloat(longitude) : null,
         locationName || null,
-        fishSpecies, lengthCm ? parseFloat(lengthCm) : null,
-        weightKg ? parseFloat(weightKg) : null, photoUrl,
-        technique || null, kept === 'true' || kept === true, notes || null,
-        aiSpecies || null, aiConfidence ? parseFloat(aiConfidence) : null,
+        fishSpecies,
+        lengthCm ? parseFloat(lengthCm) : null,
+        weightKg ? parseFloat(weightKg) : null,
+        photoUrl,
+        technique || null,
+        kept === 'true' || kept === true,
+        notes || null,
+        aiSpecies || null,
+        aiConfidence ? parseFloat(aiConfidence) : null,
         aiLengthEst ? parseFloat(aiLengthEst) : null,
       ]
     );
@@ -199,15 +158,13 @@ router.post('/', auth, upload.single('photo'), async (req, res) => {
   }
 });
 
-// ── PUT /api/catches/:id ───────────────────────────────────
-// Fang bearbeiten (alle Felder)
+// PUT /api/catches/:id
 router.put('/:id', auth, async (req, res) => {
   try {
     const {
       catchDate, catchTime, latitude, longitude, locationName,
       fishSpecies, lengthCm, weightKg, technique, kept, notes,
     } = req.body;
-
     const { rows } = await pool.query(
       `UPDATE catches SET
         catch_date = COALESCE($1, catch_date),
@@ -216,8 +173,7 @@ router.put('/:id', auth, async (req, res) => {
         longitude = COALESCE($4, longitude),
         location_name = COALESCE($5, location_name),
         fish_species = COALESCE($6, fish_species),
-        length_cm = $7,
-        weight_kg = $8,
+        length_cm = $7, weight_kg = $8,
         technique = COALESCE($9, technique),
         kept = COALESCE($10, kept),
         notes = $11,
@@ -226,18 +182,17 @@ router.put('/:id', auth, async (req, res) => {
       RETURNING *`,
       [
         catchDate || null, catchTime || null,
-        latitude ? parseFloat(latitude) : null, longitude ? parseFloat(longitude) : null,
+        latitude ? parseFloat(latitude) : null,
+        longitude ? parseFloat(longitude) : null,
         locationName || null, fishSpecies || null,
         lengthCm != null ? parseFloat(lengthCm) : null,
         weightKg != null ? parseFloat(weightKg) : null,
-        technique || null, kept, notes != null ? notes : null,
+        technique || null, kept,
+        notes != null ? notes : null,
         req.params.id, req.user.id,
       ]
     );
-
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Fang nicht gefunden.' });
-    }
+    if (rows.length === 0) return res.status(404).json({ error: 'Fang nicht gefunden.' });
     res.json(rows[0]);
   } catch (err) {
     console.error('PUT /catches error:', err);
@@ -245,20 +200,18 @@ router.put('/:id', auth, async (req, res) => {
   }
 });
 
-// ── DELETE /api/catches/:id ────────────────────────────────
+// DELETE /api/catches/:id
 router.delete('/:id', auth, async (req, res) => {
   try {
     const { rowCount } = await pool.query(
       'DELETE FROM catches WHERE id = $1 AND user_id = $2',
       [req.params.id, req.user.id]
     );
-    if (rowCount === 0) {
-      return res.status(404).json({ error: 'Fang nicht gefunden.' });
-    }
-    res.json({ message: 'Fang gelöscht.' });
+    if (rowCount === 0) return res.status(404).json({ error: 'Fang nicht gefunden.' });
+    res.json({ message: 'Fang geloescht.' });
   } catch (err) {
     console.error('DELETE /catches error:', err);
-    res.status(500).json({ error: 'Fang konnte nicht gelöscht werden.' });
+    res.status(500).json({ error: 'Fang konnte nicht geloescht werden.' });
   }
 });
 
