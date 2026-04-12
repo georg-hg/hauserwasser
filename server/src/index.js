@@ -18,7 +18,6 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.get('/', (req, res) => res.json({ status: 'ok', app: 'Hauserwasser API' }));
 
-// Health Check VOR Rate Limiter
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -68,72 +67,97 @@ async function autoMigrate() {
     await pool.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='catches' AND column_name='fishing_day_id') THEN ALTER TABLE catches ADD COLUMN fishing_day_id UUID REFERENCES fishing_days(id) ON DELETE SET NULL; END IF; END $$;`);
     await pool.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fishing_days' AND column_name='latitude') THEN ALTER TABLE fishing_days ADD COLUMN latitude DECIMAL(10,7); ALTER TABLE fishing_days ADD COLUMN longitude DECIMAL(10,7); ALTER TABLE fishing_days ADD COLUMN position_updated_at TIMESTAMPTZ; END IF; END $$;`);
 
-    // -- Besatz-Tabelle
+    // Besatz-Tabelle erstellen (quantity_kg nullable fuer Planungseintraege)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS stockings (
-        id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        stocked_at           TIMESTAMPTZ,
-        planned_date         DATE,
-        season_year          INTEGER NOT NULL,
-        fish_species         VARCHAR(100) NOT NULL,
-        quantity_kg          DECIMAL(8,2) NOT NULL,
-        quantity_count       INTEGER,
-        cost_eur             DECIMAL(10,2),
+        id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        stocked_at            TIMESTAMPTZ,
+        planned_date          DATE,
+        season_year           INTEGER NOT NULL,
+        fish_species          VARCHAR(100) NOT NULL,
+        quantity_kg           DECIMAL(8,2),
+        quantity_count        INTEGER,
+        cost_eur              DECIMAL(10,2),
         price_per_kg_override DECIMAL(8,2),
-        source               VARCHAR(255),
-        age_class            VARCHAR(50),
-        is_planned           BOOLEAN NOT NULL DEFAULT false,
-        notes                TEXT,
-        created_by           UUID REFERENCES users(id) ON DELETE SET NULL,
-        updated_at           TIMESTAMPTZ,
-        created_at           TIMESTAMPTZ DEFAULT NOW()
+        source                VARCHAR(255),
+        age_class             VARCHAR(50),
+        is_planned            BOOLEAN NOT NULL DEFAULT false,
+        notes                 TEXT,
+        created_by            UUID REFERENCES users(id) ON DELETE SET NULL,
+        updated_at            TIMESTAMPTZ,
+        created_at            TIMESTAMPTZ DEFAULT NOW()
       );
-      CREATE INDEX IF NOT EXISTS idx_stockings_season ON stockings(season_year, is_planned, stocked_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_stockings_season
+        ON stockings(season_year, is_planned, stocked_at DESC);
     `);
-    // Spalten nachtraeglich ergaenzen (idempotent)
+
+    // Idempotente Spalten-Migrationen
     await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS cost_eur DECIMAL(10,2);`);
     await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS price_per_kg_override DECIMAL(8,2);`);
-    await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS is_planned BOOLEAN NOT NULL DEFAULT false;`);
     await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS planned_date DATE;`);
-    // stocked_at auf nullable setzen (Planungseintraege haben kein Ist-Datum)
-    await pool.query(`ALTER TABLE stockings ALTER COLUMN stocked_at DROP NOT NULL;`).catch(() => {});
+    await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS is_planned BOOLEAN NOT NULL DEFAULT false;`).catch(() => {});
 
-    // -- Ist-Besatz 10.04.2026: RBF 120kg EUR 1264, BF 30kg EUR 316
+    // stocked_at und quantity_kg auf nullable setzen (wichtig!)
+    await pool.query(`
+      DO $$ BEGIN
+        ALTER TABLE stockings ALTER COLUMN stocked_at DROP NOT NULL;
+      EXCEPTION WHEN others THEN NULL;
+      END $$;
+    `);
+    await pool.query(`
+      DO $$ BEGIN
+        ALTER TABLE stockings ALTER COLUMN quantity_kg DROP NOT NULL;
+      EXCEPTION WHEN others THEN NULL;
+      END $$;
+    `);
+
+    // Ist-Besatz 10.04.2026
     await pool.query(`
       INSERT INTO stockings (stocked_at, season_year, fish_species, quantity_kg, cost_eur, age_class, is_planned, notes)
       SELECT '2026-04-10 16:00:00+02', 2026, 'rainbow_trout', 120, 1264.00, 'fangfertig', false,
              'Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg'
-      WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='rainbow_trout' AND stocked_at::date='2026-04-10');
+      WHERE NOT EXISTS (
+        SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='rainbow_trout'
+          AND stocked_at IS NOT NULL AND stocked_at::date='2026-04-10'
+      );
     `);
-    await pool.query(`UPDATE stockings SET cost_eur=1264.00, is_planned=false, notes='Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg' WHERE season_year=2026 AND fish_species='rainbow_trout' AND stocked_at::date='2026-04-10' AND cost_eur IS NULL;`);
-
+    await pool.query(`
+      UPDATE stockings SET cost_eur=1264.00, is_planned=false,
+        notes='Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg'
+      WHERE season_year=2026 AND fish_species='rainbow_trout'
+        AND stocked_at IS NOT NULL AND stocked_at::date='2026-04-10' AND cost_eur IS NULL;
+    `);
     await pool.query(`
       INSERT INTO stockings (stocked_at, season_year, fish_species, quantity_kg, cost_eur, age_class, is_planned, notes)
       SELECT '2026-04-10 16:00:00+02', 2026, 'brown_trout', 30, 316.00, 'fangfertig', false,
              'Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg'
-      WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='brown_trout' AND stocked_at::date='2026-04-10');
+      WHERE NOT EXISTS (
+        SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='brown_trout'
+          AND stocked_at IS NOT NULL AND stocked_at::date='2026-04-10'
+      );
     `);
-    await pool.query(`UPDATE stockings SET cost_eur=316.00, is_planned=false, notes='Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg' WHERE season_year=2026 AND fish_species='brown_trout' AND stocked_at::date='2026-04-10' AND cost_eur IS NULL;`);
-
-    // -- Besatzplanung 2026: Karpfen (Fischzucht Maier, EUR 9/kg)
     await pool.query(`
-      INSERT INTO stockings (season_year, fish_species, quantity_kg, price_per_kg_override, cost_eur, source, age_class, is_planned, notes)
-      SELECT 2026, 'carp', NULL, 9.00, NULL, 'Fischzucht Maier', 'fangfertig', true,
+      UPDATE stockings SET cost_eur=316.00, is_planned=false,
+        notes='Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg'
+      WHERE season_year=2026 AND fish_species='brown_trout'
+        AND stocked_at IS NOT NULL AND stocked_at::date='2026-04-10' AND cost_eur IS NULL;
+    `);
+
+    // Besatzplanung 2026
+    await pool.query(`
+      INSERT INTO stockings (season_year, fish_species, price_per_kg_override, source, age_class, is_planned, notes)
+      SELECT 2026, 'carp', 9.00, 'Fischzucht Maier', 'fangfertig', true,
              'Besatzplanung 2026 - Menge und Termin noch offen - EUR 9.00/kg'
       WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='carp' AND is_planned=true);
     `);
-
-    // -- Besatzplanung 2026: Barsch
     await pool.query(`
-      INSERT INTO stockings (season_year, fish_species, quantity_kg, is_planned, notes)
-      SELECT 2026, 'perch', NULL, true, 'Besatzplanung 2026 - Menge, Termin und Preis noch offen'
+      INSERT INTO stockings (season_year, fish_species, is_planned, notes)
+      SELECT 2026, 'perch', true, 'Besatzplanung 2026 - Menge, Termin und Preis noch offen'
       WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='perch' AND is_planned=true);
     `);
-
-    // -- Besatzplanung 2026: Hecht
     await pool.query(`
-      INSERT INTO stockings (season_year, fish_species, quantity_kg, is_planned, notes)
-      SELECT 2026, 'pike', NULL, true, 'Besatzplanung 2026 - Menge, Termin und Preis noch offen'
+      INSERT INTO stockings (season_year, fish_species, is_planned, notes)
+      SELECT 2026, 'pike', true, 'Besatzplanung 2026 - Menge, Termin und Preis noch offen'
       WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='pike' AND is_planned=true);
     `);
 
