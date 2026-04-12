@@ -13,7 +13,7 @@ fs.mkdirSync(uploadsDir, { recursive: true });
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ── Middleware ──────────────────────────────────────────────
+// -- Middleware
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
@@ -21,12 +21,12 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// ── Root (für UptimeRobot) ────────────────────────────────
+// -- Root (fuer UptimeRobot)
 app.get('/', (req, res) => {
   res.json({ status: 'ok', app: 'Hauserwasser API' });
 });
 
-// ── Health Check (VOR Rate Limiter – Render ruft das häufig auf) ──
+// -- Health Check (VOR Rate Limiter - Render ruft das haeufig auf)
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -36,29 +36,29 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Rate limiting (nach Health Check, damit Render-Checks nicht blockiert werden)
+// Rate limiting (nach Health Check)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
-  message: { error: 'Zu viele Anfragen – bitte warte kurz.' },
+  message: { error: 'Zu viele Anfragen - bitte warte kurz.' },
 });
 app.use('/api/', apiLimiter);
 
-// ── Routes ─────────────────────────────────────────────────
-app.use('/api/auth', require('./routes/auth.routes'));
-app.use('/api/catches', require('./routes/catches.routes'));
-app.use('/api/seasons', require('./routes/seasons.routes'));
-app.use('/api/fish-id', require('./routes/fish-id.routes'));
-app.use('/api/admin', require('./routes/admin.routes'));
-app.use('/api/water', require('./routes/water.routes'));
+// -- Routes
+app.use('/api/auth',         require('./routes/auth.routes'));
+app.use('/api/catches',      require('./routes/catches.routes'));
+app.use('/api/seasons',      require('./routes/seasons.routes'));
+app.use('/api/fish-id',      require('./routes/fish-id.routes'));
+app.use('/api/admin',        require('./routes/admin.routes'));
+app.use('/api/water',        require('./routes/water.routes'));
 app.use('/api/fishing-days', require('./routes/fishing-days.routes'));
-app.use('/api/weather', require('./routes/weather.routes'));
-app.use('/api/monitoring', require('./routes/monitoring.routes'));
-app.use('/api/predators', require('./routes/predators.routes'));
-app.use('/api/revier', require('./routes/revier.routes'));
-app.use('/api/stockings', require('./routes/stockings.routes'));
+app.use('/api/weather',      require('./routes/weather.routes'));
+app.use('/api/monitoring',   require('./routes/monitoring.routes'));
+app.use('/api/predators',    require('./routes/predators.routes'));
+app.use('/api/revier',       require('./routes/revier.routes'));
+app.use('/api/stockings',    require('./routes/stockings.routes'));
 
-// ── Error handler ──────────────────────────────────────────
+// -- Error handler
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(err.status || 500).json({
@@ -68,10 +68,9 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ── Auto-Migration beim Start ───────────────────────────────
+// -- Auto-Migration beim Start
 async function autoMigrate() {
   try {
-    // Blocked-Felder auf users
     await pool.query(`
       DO $$ BEGIN
         IF NOT EXISTS (
@@ -85,7 +84,6 @@ async function autoMigrate() {
       END $$;
     `);
 
-    // Admin-Notifications Tabelle
     await pool.query(`
       CREATE TABLE IF NOT EXISTS admin_notifications (
         id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -100,7 +98,6 @@ async function autoMigrate() {
         ON admin_notifications(read, created_at DESC);
     `);
 
-    // Monitoring-Daten Tabelle (Renaturierung Krems)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS monitoring_data (
         id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -117,7 +114,6 @@ async function autoMigrate() {
         ON monitoring_data(measured_at DESC);
     `);
 
-    // Import-Tracking Tabelle
     await pool.query(`
       CREATE TABLE IF NOT EXISTS monitoring_imports (
         id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -134,7 +130,6 @@ async function autoMigrate() {
         ON monitoring_imports(uploaded_at DESC);
     `);
 
-    // Praedatoren-Sichtungen Tabelle
     await pool.query(`
       CREATE TABLE IF NOT EXISTS predator_sightings (
         id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -155,7 +150,6 @@ async function autoMigrate() {
         ON predator_sightings(sighted_at DESC);
     `);
 
-    // is_kontrolleur Flag auf users
     await pool.query(`
       DO $$ BEGIN
         IF NOT EXISTS (
@@ -167,7 +161,6 @@ async function autoMigrate() {
       END $$;
     `);
 
-    // Gewaesserdaten-History (30-Tage-Trend)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS water_history (
         id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -181,7 +174,6 @@ async function autoMigrate() {
         ON water_history(station, recorded_at DESC);
     `);
 
-    // last_seen fuer Online-Status
     await pool.query(`
       DO $$ BEGIN
         IF NOT EXISTS (
@@ -193,7 +185,6 @@ async function autoMigrate() {
       END $$;
     `);
 
-    // Fischtag-Erweiterung: technique, notes, completed
     await pool.query(`
       DO $$ BEGIN
         IF NOT EXISTS (
@@ -208,7 +199,6 @@ async function autoMigrate() {
       END $$;
     `);
 
-    // Catches: fishing_day_id FK
     await pool.query(`
       DO $$ BEGIN
         IF NOT EXISTS (
@@ -220,7 +210,6 @@ async function autoMigrate() {
       END $$;
     `);
 
-    // Live-GPS-Position auf fishing_days
     await pool.query(`
       DO $$ BEGIN
         IF NOT EXISTS (
@@ -234,7 +223,7 @@ async function autoMigrate() {
       END $$;
     `);
 
-    // ── Besatz-Tabelle ──────────────────────────────────────
+    // -- Besatz-Tabelle
     await pool.query(`
       CREATE TABLE IF NOT EXISTS stockings (
         id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -243,6 +232,7 @@ async function autoMigrate() {
         fish_species    VARCHAR(100) NOT NULL,
         quantity_kg     DECIMAL(8,2) NOT NULL,
         quantity_count  INTEGER,
+        cost_eur        DECIMAL(10,2),
         source          VARCHAR(255),
         age_class       VARCHAR(50),
         notes           TEXT,
@@ -254,28 +244,54 @@ async function autoMigrate() {
         ON stockings(season_year, stocked_at DESC);
     `);
 
-    // Ersten Besatz eintragen (10.04.2026) falls noch nicht vorhanden
+    -- cost_eur nachtraeglich hinzufuegen falls Tabelle schon existiert
     await pool.query(`
-      INSERT INTO stockings (stocked_at, season_year, fish_species, quantity_kg, age_class, notes)
-      SELECT '2026-04-10 16:00:00+02'::timestamptz, 2026, 'rainbow_trout', 120, 'fangfertig',
-             'Fruehjahrsbesatz 2026 – 16:00 bis 17:30 Uhr'
+      ALTER TABLE stockings ADD COLUMN IF NOT EXISTS cost_eur DECIMAL(10,2);
+    `);
+
+    // Fruehjahrsbesatz 10.04.2026 eintragen / Kosten aktualisieren
+    // Gesamtrechnung EUR 1580 fuer 150 kg => EUR 10.5333.../kg
+    // RBF: 120 kg * 10.5333 = EUR 1264.00
+    // BF:   30 kg * 10.5333 = EUR 316.00
+    await pool.query(`
+      INSERT INTO stockings
+        (stocked_at, season_year, fish_species, quantity_kg, cost_eur, age_class, notes)
+      SELECT
+        '2026-04-10 16:00:00+02'::timestamptz, 2026, 'rainbow_trout',
+        120, 1264.00, 'fangfertig',
+        'Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg'
       WHERE NOT EXISTS (
         SELECT 1 FROM stockings
-        WHERE season_year = 2026
-          AND fish_species = 'rainbow_trout'
+        WHERE season_year = 2026 AND fish_species = 'rainbow_trout'
+          AND stocked_at::date = '2026-04-10'
+      );
+    `);
+    // Kosten aktualisieren falls bereits ohne Kosten eingetragen
+    await pool.query(`
+      UPDATE stockings SET cost_eur = 1264.00,
+        notes = 'Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg'
+      WHERE season_year = 2026 AND fish_species = 'rainbow_trout'
+        AND stocked_at::date = '2026-04-10' AND cost_eur IS NULL;
+    `);
+
+    await pool.query(`
+      INSERT INTO stockings
+        (stocked_at, season_year, fish_species, quantity_kg, cost_eur, age_class, notes)
+      SELECT
+        '2026-04-10 16:00:00+02'::timestamptz, 2026, 'brown_trout',
+        30, 316.00, 'fangfertig',
+        'Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM stockings
+        WHERE season_year = 2026 AND fish_species = 'brown_trout'
           AND stocked_at::date = '2026-04-10'
       );
     `);
     await pool.query(`
-      INSERT INTO stockings (stocked_at, season_year, fish_species, quantity_kg, age_class, notes)
-      SELECT '2026-04-10 16:00:00+02'::timestamptz, 2026, 'brown_trout', 30, 'fangfertig',
-             'Fruehjahrsbesatz 2026 – 16:00 bis 17:30 Uhr'
-      WHERE NOT EXISTS (
-        SELECT 1 FROM stockings
-        WHERE season_year = 2026
-          AND fish_species = 'brown_trout'
-          AND stocked_at::date = '2026-04-10'
-      );
+      UPDATE stockings SET cost_eur = 316.00,
+        notes = 'Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg'
+      WHERE season_year = 2026 AND fish_species = 'brown_trout'
+        AND stocked_at::date = '2026-04-10' AND cost_eur IS NULL;
     `);
 
     console.log('Auto-Migration erfolgreich.');
@@ -284,17 +300,12 @@ async function autoMigrate() {
   }
 }
 
-// ── Start ──────────────────────────────────────────────────
 async function start() {
   try {
     const { rows } = await pool.query('SELECT NOW()');
     console.log('PostgreSQL verbunden:', rows[0].now);
-
-    // Auto-Migrate: Fischerkarte Wallet Spalte
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS fisher_card_url TEXT').catch(() => {});
-
     await autoMigrate();
-
     app.listen(PORT, () => {
       console.log(`Hauserwasser API laeuft auf Port ${PORT}`);
     });
