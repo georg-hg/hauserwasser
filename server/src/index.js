@@ -10,6 +10,7 @@ const uploadsDir = path.join(__dirname, '../uploads/monitoring');
 fs.mkdirSync(uploadsDir, { recursive: true });
 
 const app = express();
+app.set('trust proxy', 1); // Render sitzt hinter Proxy - noetig fuer Rate Limiter
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
@@ -25,22 +26,6 @@ app.get('/api/health', async (req, res) => {
   } catch {
     res.status(500).json({ status: 'error', db: 'disconnected' });
   }
-});
-
-// Einmalige Migration catches.latitude/longitude nullable
-app.get('/api/fix-catches', async (req, res) => {
-  const results = {};
-  const run = async (label, sql) => {
-    try { await pool.query(sql); results[label] = 'ok'; }
-    catch (e) { results[label] = e.message; }
-  };
-  await run('latitude DROP NOT NULL',  `ALTER TABLE catches ALTER COLUMN latitude DROP NOT NULL`);
-  await run('longitude DROP NOT NULL', `ALTER TABLE catches ALTER COLUMN longitude DROP NOT NULL`);
-  const { rows } = await pool.query(`
-    SELECT column_name, is_nullable FROM information_schema.columns
-    WHERE table_name = 'catches' AND column_name IN ('latitude','longitude')
-  `).catch(() => ({ rows: [] }));
-  res.json({ ok: true, migrations: results, columns: rows });
 });
 
 const apiLimiter = rateLimit({
@@ -82,7 +67,6 @@ async function autoMigrate() {
     await pool.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fishing_days' AND column_name='technique') THEN ALTER TABLE fishing_days ADD COLUMN technique VARCHAR(50); ALTER TABLE fishing_days ADD COLUMN notes TEXT; ALTER TABLE fishing_days ADD COLUMN completed BOOLEAN DEFAULT false; ALTER TABLE fishing_days ADD COLUMN created_at TIMESTAMPTZ DEFAULT NOW(); END IF; END $$;`);
     await pool.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='catches' AND column_name='fishing_day_id') THEN ALTER TABLE catches ADD COLUMN fishing_day_id UUID REFERENCES fishing_days(id) ON DELETE SET NULL; END IF; END $$;`);
     await pool.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fishing_days' AND column_name='latitude') THEN ALTER TABLE fishing_days ADD COLUMN latitude DECIMAL(10,7); ALTER TABLE fishing_days ADD COLUMN longitude DECIMAL(10,7); ALTER TABLE fishing_days ADD COLUMN position_updated_at TIMESTAMPTZ; END IF; END $$;`);
-    // catches latitude/longitude nullable
     await pool.query(`DO $$ BEGIN ALTER TABLE catches ALTER COLUMN latitude DROP NOT NULL; EXCEPTION WHEN others THEN NULL; END $$;`);
     await pool.query(`DO $$ BEGIN ALTER TABLE catches ALTER COLUMN longitude DROP NOT NULL; EXCEPTION WHEN others THEN NULL; END $$;`);
 
