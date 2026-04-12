@@ -18,7 +18,6 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.get('/', (req, res) => res.json({ status: 'ok', app: 'Hauserwasser API' }));
 
-// Health Check VOR Rate Limiter
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -26,32 +25,6 @@ app.get('/api/health', async (req, res) => {
   } catch {
     res.status(500).json({ status: 'error', db: 'disconnected' });
   }
-});
-
-// ── Einmalige DB-Migration fuer stockings (kein Auth noetig, oeffentlich) ──
-// Nach erfolgreichem Aufruf kann dieser Endpoint wieder entfernt werden.
-app.get('/api/migrate-stockings', async (req, res) => {
-  const results = {};
-  const run = async (label, sql) => {
-    try { await pool.query(sql); results[label] = 'ok'; }
-    catch (e) { results[label] = e.message; }
-  };
-
-  await run('stocked_at DROP NOT NULL',   `ALTER TABLE stockings ALTER COLUMN stocked_at DROP NOT NULL`);
-  await run('quantity_kg DROP NOT NULL',  `ALTER TABLE stockings ALTER COLUMN quantity_kg DROP NOT NULL`);
-  await run('cost_eur column',            `ALTER TABLE stockings ADD COLUMN IF NOT EXISTS cost_eur DECIMAL(10,2)`);
-  await run('price_per_kg_override',      `ALTER TABLE stockings ADD COLUMN IF NOT EXISTS price_per_kg_override DECIMAL(8,2)`);
-  await run('planned_date column',        `ALTER TABLE stockings ADD COLUMN IF NOT EXISTS planned_date DATE`);
-  await run('is_planned column',          `ALTER TABLE stockings ADD COLUMN IF NOT EXISTS is_planned BOOLEAN NOT NULL DEFAULT false`);
-
-  const { rows: cols } = await pool.query(`
-    SELECT column_name, is_nullable, data_type
-    FROM information_schema.columns
-    WHERE table_name = 'stockings'
-    ORDER BY ordinal_position
-  `).catch(() => ({ rows: [] }));
-
-  res.json({ ok: true, migrations: results, columns: cols });
 });
 
 const apiLimiter = rateLimit({
