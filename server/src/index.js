@@ -18,6 +18,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.get('/', (req, res) => res.json({ status: 'ok', app: 'Hauserwasser API' }));
 
+// Health Check VOR Rate Limiter
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -25,6 +26,32 @@ app.get('/api/health', async (req, res) => {
   } catch {
     res.status(500).json({ status: 'error', db: 'disconnected' });
   }
+});
+
+// ── Einmalige DB-Migration fuer stockings (kein Auth noetig, oeffentlich) ──
+// Nach erfolgreichem Aufruf kann dieser Endpoint wieder entfernt werden.
+app.get('/api/migrate-stockings', async (req, res) => {
+  const results = {};
+  const run = async (label, sql) => {
+    try { await pool.query(sql); results[label] = 'ok'; }
+    catch (e) { results[label] = e.message; }
+  };
+
+  await run('stocked_at DROP NOT NULL',   `ALTER TABLE stockings ALTER COLUMN stocked_at DROP NOT NULL`);
+  await run('quantity_kg DROP NOT NULL',  `ALTER TABLE stockings ALTER COLUMN quantity_kg DROP NOT NULL`);
+  await run('cost_eur column',            `ALTER TABLE stockings ADD COLUMN IF NOT EXISTS cost_eur DECIMAL(10,2)`);
+  await run('price_per_kg_override',      `ALTER TABLE stockings ADD COLUMN IF NOT EXISTS price_per_kg_override DECIMAL(8,2)`);
+  await run('planned_date column',        `ALTER TABLE stockings ADD COLUMN IF NOT EXISTS planned_date DATE`);
+  await run('is_planned column',          `ALTER TABLE stockings ADD COLUMN IF NOT EXISTS is_planned BOOLEAN NOT NULL DEFAULT false`);
+
+  const { rows: cols } = await pool.query(`
+    SELECT column_name, is_nullable, data_type
+    FROM information_schema.columns
+    WHERE table_name = 'stockings'
+    ORDER BY ordinal_position
+  `).catch(() => ({ rows: [] }));
+
+  res.json({ ok: true, migrations: results, columns: cols });
 });
 
 const apiLimiter = rateLimit({
@@ -67,7 +94,6 @@ async function autoMigrate() {
     await pool.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='catches' AND column_name='fishing_day_id') THEN ALTER TABLE catches ADD COLUMN fishing_day_id UUID REFERENCES fishing_days(id) ON DELETE SET NULL; END IF; END $$;`);
     await pool.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fishing_days' AND column_name='latitude') THEN ALTER TABLE fishing_days ADD COLUMN latitude DECIMAL(10,7); ALTER TABLE fishing_days ADD COLUMN longitude DECIMAL(10,7); ALTER TABLE fishing_days ADD COLUMN position_updated_at TIMESTAMPTZ; END IF; END $$;`);
 
-    // Besatz-Tabelle erstellen (quantity_kg nullable fuer Planungseintraege)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS stockings (
         id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -91,75 +117,20 @@ async function autoMigrate() {
         ON stockings(season_year, is_planned, stocked_at DESC);
     `);
 
-    // Idempotente Spalten-Migrationen
     await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS cost_eur DECIMAL(10,2);`);
     await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS price_per_kg_override DECIMAL(8,2);`);
     await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS planned_date DATE;`);
     await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS is_planned BOOLEAN NOT NULL DEFAULT false;`).catch(() => {});
+    await pool.query(`DO $$ BEGIN ALTER TABLE stockings ALTER COLUMN stocked_at DROP NOT NULL; EXCEPTION WHEN others THEN NULL; END $$;`);
+    await pool.query(`DO $$ BEGIN ALTER TABLE stockings ALTER COLUMN quantity_kg DROP NOT NULL; EXCEPTION WHEN others THEN NULL; END $$;`);
 
-    // stocked_at und quantity_kg auf nullable setzen (wichtig!)
-    await pool.query(`
-      DO $$ BEGIN
-        ALTER TABLE stockings ALTER COLUMN stocked_at DROP NOT NULL;
-      EXCEPTION WHEN others THEN NULL;
-      END $$;
-    `);
-    await pool.query(`
-      DO $$ BEGIN
-        ALTER TABLE stockings ALTER COLUMN quantity_kg DROP NOT NULL;
-      EXCEPTION WHEN others THEN NULL;
-      END $$;
-    `);
-
-    // Ist-Besatz 10.04.2026
-    await pool.query(`
-      INSERT INTO stockings (stocked_at, season_year, fish_species, quantity_kg, cost_eur, age_class, is_planned, notes)
-      SELECT '2026-04-10 16:00:00+02', 2026, 'rainbow_trout', 120, 1264.00, 'fangfertig', false,
-             'Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg'
-      WHERE NOT EXISTS (
-        SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='rainbow_trout'
-          AND stocked_at IS NOT NULL AND stocked_at::date='2026-04-10'
-      );
-    `);
-    await pool.query(`
-      UPDATE stockings SET cost_eur=1264.00, is_planned=false,
-        notes='Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg'
-      WHERE season_year=2026 AND fish_species='rainbow_trout'
-        AND stocked_at IS NOT NULL AND stocked_at::date='2026-04-10' AND cost_eur IS NULL;
-    `);
-    await pool.query(`
-      INSERT INTO stockings (stocked_at, season_year, fish_species, quantity_kg, cost_eur, age_class, is_planned, notes)
-      SELECT '2026-04-10 16:00:00+02', 2026, 'brown_trout', 30, 316.00, 'fangfertig', false,
-             'Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg'
-      WHERE NOT EXISTS (
-        SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='brown_trout'
-          AND stocked_at IS NOT NULL AND stocked_at::date='2026-04-10'
-      );
-    `);
-    await pool.query(`
-      UPDATE stockings SET cost_eur=316.00, is_planned=false,
-        notes='Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg'
-      WHERE season_year=2026 AND fish_species='brown_trout'
-        AND stocked_at IS NOT NULL AND stocked_at::date='2026-04-10' AND cost_eur IS NULL;
-    `);
-
-    // Besatzplanung 2026
-    await pool.query(`
-      INSERT INTO stockings (season_year, fish_species, price_per_kg_override, source, age_class, is_planned, notes)
-      SELECT 2026, 'carp', 9.00, 'Fischzucht Maier', 'fangfertig', true,
-             'Besatzplanung 2026 - Menge und Termin noch offen - EUR 9.00/kg'
-      WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='carp' AND is_planned=true);
-    `);
-    await pool.query(`
-      INSERT INTO stockings (season_year, fish_species, is_planned, notes)
-      SELECT 2026, 'perch', true, 'Besatzplanung 2026 - Menge, Termin und Preis noch offen'
-      WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='perch' AND is_planned=true);
-    `);
-    await pool.query(`
-      INSERT INTO stockings (season_year, fish_species, is_planned, notes)
-      SELECT 2026, 'pike', true, 'Besatzplanung 2026 - Menge, Termin und Preis noch offen'
-      WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='pike' AND is_planned=true);
-    `);
+    await pool.query(`INSERT INTO stockings (stocked_at, season_year, fish_species, quantity_kg, cost_eur, age_class, is_planned, notes) SELECT '2026-04-10 16:00:00+02', 2026, 'rainbow_trout', 120, 1264.00, 'fangfertig', false, 'Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg' WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='rainbow_trout' AND stocked_at IS NOT NULL AND stocked_at::date='2026-04-10');`);
+    await pool.query(`UPDATE stockings SET cost_eur=1264.00, is_planned=false, notes='Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg' WHERE season_year=2026 AND fish_species='rainbow_trout' AND stocked_at IS NOT NULL AND stocked_at::date='2026-04-10' AND cost_eur IS NULL;`);
+    await pool.query(`INSERT INTO stockings (stocked_at, season_year, fish_species, quantity_kg, cost_eur, age_class, is_planned, notes) SELECT '2026-04-10 16:00:00+02', 2026, 'brown_trout', 30, 316.00, 'fangfertig', false, 'Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg' WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='brown_trout' AND stocked_at IS NOT NULL AND stocked_at::date='2026-04-10');`);
+    await pool.query(`UPDATE stockings SET cost_eur=316.00, is_planned=false, notes='Fruehjahrsbesatz 2026 - 16:00 bis 17:30 Uhr - EUR 10.53/kg' WHERE season_year=2026 AND fish_species='brown_trout' AND stocked_at IS NOT NULL AND stocked_at::date='2026-04-10' AND cost_eur IS NULL;`);
+    await pool.query(`INSERT INTO stockings (season_year, fish_species, price_per_kg_override, source, age_class, is_planned, notes) SELECT 2026, 'carp', 9.00, 'Fischzucht Maier', 'fangfertig', true, 'Besatzplanung 2026 - Menge und Termin noch offen - EUR 9.00/kg' WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='carp' AND is_planned=true);`);
+    await pool.query(`INSERT INTO stockings (season_year, fish_species, is_planned, notes) SELECT 2026, 'perch', true, 'Besatzplanung 2026 - Menge, Termin und Preis noch offen' WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='perch' AND is_planned=true);`);
+    await pool.query(`INSERT INTO stockings (season_year, fish_species, is_planned, notes) SELECT 2026, 'pike', true, 'Besatzplanung 2026 - Menge, Termin und Preis noch offen' WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='pike' AND is_planned=true);`);
 
     console.log('Auto-Migration erfolgreich.');
   } catch (err) {
