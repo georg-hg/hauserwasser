@@ -138,6 +138,7 @@ router.get('/stats', auth, async (req, res) => {
 
 // ── POST /api/catches ──────────────────────────────────────
 // Neuen Fang eintragen
+// latitude/longitude sind optional – nicht jeder setzt einen Pin
 router.post('/', auth, upload.single('photo'), async (req, res) => {
   try {
     const {
@@ -146,9 +147,9 @@ router.post('/', auth, upload.single('photo'), async (req, res) => {
       aiSpecies, aiConfidence, aiLengthEst,
     } = req.body;
 
-    if (!catchDate || !latitude || !longitude || !fishSpecies) {
+    if (!catchDate || !fishSpecies) {
       return res.status(400).json({
-        error: 'Datum, Position und Fischart sind Pflichtfelder.',
+        error: 'Datum und Fischart sind Pflichtfelder.',
       });
     }
 
@@ -172,7 +173,9 @@ router.post('/', auth, upload.single('photo'), async (req, res) => {
       RETURNING *`,
       [
         req.user.id, catchDate, catchTime || null,
-        parseFloat(latitude), parseFloat(longitude), locationName || null,
+        latitude ? parseFloat(latitude) : null,
+        longitude ? parseFloat(longitude) : null,
+        locationName || null,
         fishSpecies, lengthCm ? parseFloat(lengthCm) : null,
         weightKg ? parseFloat(weightKg) : null, photoUrl,
         technique || null, kept === 'true' || kept === true, notes || null,
