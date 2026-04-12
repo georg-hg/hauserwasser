@@ -11,29 +11,40 @@ function adminOnly(req, res, next) {
   }
   next();
 }
-
 router.use(auth, adminOnly);
 
-// ── GET /api/stockings ───────────────────────────────────────
-// Alle Besaetze gefiltert nach Saison
+// Hilfsfunktion: Kilopreis berechnen (Override hat Vorrang)
+const pricePerKgExpr = `
+  CASE
+    WHEN s.price_per_kg_override IS NOT NULL THEN s.price_per_kg_override
+    WHEN s.quantity_kg > 0 AND s.cost_eur IS NOT NULL
+      THEN ROUND((s.cost_eur / s.quantity_kg)::numeric, 2)
+    ELSE NULL
+  END
+`;
+
+// -- GET /api/stockings
+// ?season=2026  (default: aktuelles Jahr)
+// ?planned=true|false|all  (default: all)
 router.get('/', async (req, res) => {
   try {
     const year = req.query.season || new Date().getFullYear();
+    const planned = req.query.planned; // 'true' | 'false' | 'all' | undefined
+
+    let filter = 'WHERE s.season_year = $1';
+    if (planned === 'true')  filter += ' AND s.is_planned = true';
+    if (planned === 'false') filter += ' AND s.is_planned = false';
 
     const { rows } = await pool.query(`
       SELECT
         s.*,
-        CASE
-          WHEN s.quantity_kg > 0 AND s.cost_eur IS NOT NULL
-          THEN ROUND((s.cost_eur / s.quantity_kg)::numeric, 2)
-          ELSE NULL
-        END AS price_per_kg,
+        (${pricePerKgExpr}) AS price_per_kg_calc,
         u.first_name AS created_by_first,
         u.last_name  AS created_by_last
       FROM stockings s
       LEFT JOIN users u ON u.id = s.created_by
-      WHERE s.season_year = $1
-      ORDER BY s.stocked_at DESC
+      ${filter}
+      ORDER BY s.is_planned ASC, COALESCE(s.planned_date, s.stocked_at) DESC
     `, [year]);
 
     res.json({ stockings: rows });
@@ -43,41 +54,53 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ── GET /api/stockings/stats ─────────────────────────────────
-// Besatz-Statistik: Gewicht, Kosten, Kilopreis, Entnahme-Vergleich
+// -- GET /api/stockings/stats
 router.get('/stats', async (req, res) => {
   try {
     const year = req.query.season || new Date().getFullYear();
 
-    // Summen pro Fischart inkl. Kosten
-    const { rows: bySpecies } = await pool.query(`
+    // Ist-Besatz: Summen pro Art
+    const { rows: actual } = await pool.query(`
       SELECT
         fish_species,
-        SUM(quantity_kg)::numeric                          AS total_kg,
-        COUNT(*)::int                                       AS stocking_events,
-        COALESCE(SUM(cost_eur), 0)::numeric                AS total_cost_eur,
+        SUM(quantity_kg)::numeric             AS total_kg,
+        COUNT(*)::int                          AS events,
+        COALESCE(SUM(cost_eur), 0)::numeric    AS total_cost_eur,
         CASE
           WHEN SUM(quantity_kg) > 0 AND SUM(cost_eur) IS NOT NULL
           THEN ROUND((SUM(cost_eur) / SUM(quantity_kg))::numeric, 2)
           ELSE NULL
-        END                                                AS avg_price_per_kg
+        END                                    AS avg_price_per_kg
       FROM stockings
-      WHERE season_year = $1
-      GROUP BY fish_species
-      ORDER BY total_kg DESC
+      WHERE season_year = $1 AND is_planned = false
+      GROUP BY fish_species ORDER BY total_kg DESC
     `, [year]);
 
-    // Gesamttotals
+    // Planung: Summen pro Art
+    const { rows: planned } = await pool.query(`
+      SELECT
+        fish_species,
+        SUM(quantity_kg)::numeric             AS planned_kg,
+        COUNT(*)::int                          AS events,
+        COALESCE(SUM(cost_eur), 0)::numeric    AS planned_cost_eur,
+        MIN(planned_date)                      AS earliest_planned_date,
+        STRING_AGG(DISTINCT source, ', ')      AS sources
+      FROM stockings
+      WHERE season_year = $1 AND is_planned = true
+      GROUP BY fish_species ORDER BY planned_kg DESC NULLS LAST
+    `, [year]);
+
+    // Gesamttotals (nur Ist)
     const { rows: totals } = await pool.query(`
       SELECT
-        COUNT(*)::int                        AS total_events,
-        COALESCE(SUM(quantity_kg), 0)        AS total_kg,
-        COALESCE(SUM(cost_eur), 0)           AS total_cost_eur
+        COUNT(*)::int                          AS total_events,
+        COALESCE(SUM(quantity_kg), 0)          AS total_kg,
+        COALESCE(SUM(cost_eur), 0)             AS total_cost_eur
       FROM stockings
-      WHERE season_year = $1
+      WHERE season_year = $1 AND is_planned = false
     `, [year]);
 
-    // Entnahme-Vergleich (wieviel kept=true pro Art)
+    // Entnahme-Vergleich
     const { rows: harvest } = await pool.query(`
       SELECT
         c.fish_species,
@@ -95,15 +118,25 @@ router.get('/stats', async (req, res) => {
 
     res.json({
       season: parseInt(year),
-      totalEvents: totals[0].total_events,
-      totalKg: parseFloat(totals[0].total_kg),
-      totalCostEur: parseFloat(totals[0].total_cost_eur),
-      bySpecies: bySpecies.map(r => ({
+      actual: {
+        totalEvents: totals[0].total_events,
+        totalKg: parseFloat(totals[0].total_kg),
+        totalCostEur: parseFloat(totals[0].total_cost_eur),
+        bySpecies: actual.map(r => ({
+          fishSpecies: r.fish_species,
+          totalKg: parseFloat(r.total_kg),
+          events: r.events,
+          totalCostEur: parseFloat(r.total_cost_eur),
+          avgPricePerKg: r.avg_price_per_kg ? parseFloat(r.avg_price_per_kg) : null,
+        })),
+      },
+      planned: planned.map(r => ({
         fishSpecies: r.fish_species,
-        totalKg: parseFloat(r.total_kg),
-        stockingEvents: r.stocking_events,
-        totalCostEur: parseFloat(r.total_cost_eur),
-        avgPricePerKg: r.avg_price_per_kg ? parseFloat(r.avg_price_per_kg) : null,
+        plannedKg: r.planned_kg ? parseFloat(r.planned_kg) : null,
+        events: r.events,
+        plannedCostEur: parseFloat(r.planned_cost_eur),
+        earliestPlannedDate: r.earliest_planned_date,
+        sources: r.sources,
       })),
       harvestComparison: harvest.map(r => ({
         fishSpecies: r.fish_species,
@@ -119,38 +152,47 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-// ── POST /api/stockings ──────────────────────────────────────
-// Neuen Besatz eintragen
+// -- POST /api/stockings
 router.post('/', async (req, res) => {
   try {
     const {
-      stockedAt, fishSpecies, quantityKg, quantityCount,
-      costEur, source, ageClass, notes,
+      stockedAt, plannedDate, fishSpecies, quantityKg, quantityCount,
+      costEur, pricePerKgOverride, source, ageClass, notes, isPlanned,
     } = req.body;
 
-    if (!stockedAt || !fishSpecies || !quantityKg) {
-      return res.status(400).json({
-        error: 'Datum, Fischart und Menge (kg) sind Pflichtfelder.',
-      });
+    if (!fishSpecies || !quantityKg) {
+      return res.status(400).json({ error: 'Fischart und Menge (kg) sind Pflichtfelder.' });
+    }
+    if (!isPlanned && !stockedAt) {
+      return res.status(400).json({ error: 'Datum ist Pflichtfeld fuer Ist-Besatz.' });
     }
 
-    const seasonYear = new Date(stockedAt).getFullYear();
+    const effectiveDate = isPlanned ? (plannedDate || stockedAt || new Date().toISOString()) : stockedAt;
+    const seasonYear = new Date(effectiveDate).getFullYear();
+
+    // Kosten aus Kilopreis berechnen wenn kein costEur aber pricePerKgOverride
+    let resolvedCostEur = costEur ? parseFloat(costEur) : null;
+    if (!resolvedCostEur && pricePerKgOverride && quantityKg) {
+      resolvedCostEur = parseFloat(pricePerKgOverride) * parseFloat(quantityKg);
+    }
 
     const { rows } = await pool.query(`
-      INSERT INTO stockings
-        (stocked_at, season_year, fish_species, quantity_kg, quantity_count,
-         cost_eur, source, age_class, notes, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING *,
-        CASE WHEN quantity_kg > 0 AND cost_eur IS NOT NULL
-          THEN ROUND((cost_eur / quantity_kg)::numeric, 2)
-          ELSE NULL END AS price_per_kg
+      INSERT INTO stockings (
+        stocked_at, planned_date, season_year, fish_species,
+        quantity_kg, quantity_count, cost_eur, price_per_kg_override,
+        source, age_class, notes, is_planned, created_by
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      RETURNING *
     `, [
-      stockedAt, seasonYear, fishSpecies,
+      isPlanned ? null : stockedAt,
+      plannedDate || null,
+      seasonYear, fishSpecies,
       parseFloat(quantityKg),
       quantityCount ? parseInt(quantityCount) : null,
-      costEur ? parseFloat(costEur) : null,
+      resolvedCostEur,
+      pricePerKgOverride ? parseFloat(pricePerKgOverride) : null,
       source || null, ageClass || null, notes || null,
+      isPlanned === true || isPlanned === 'true',
       req.user.id,
     ]);
 
@@ -161,43 +203,50 @@ router.post('/', async (req, res) => {
   }
 });
 
-// ── PUT /api/stockings/:id ───────────────────────────────────
-// Besatz bearbeiten
+// -- PUT /api/stockings/:id
+// Auch zum Umwandeln: Planung -> Ist (is_planned=false + stocked_at setzen)
 router.put('/:id', async (req, res) => {
   try {
     const {
-      stockedAt, fishSpecies, quantityKg, quantityCount,
-      costEur, source, ageClass, notes,
+      stockedAt, plannedDate, fishSpecies, quantityKg, quantityCount,
+      costEur, pricePerKgOverride, source, ageClass, notes, isPlanned,
     } = req.body;
+
+    let resolvedCostEur = costEur != null ? parseFloat(costEur) : null;
+    if (resolvedCostEur === null && pricePerKgOverride && quantityKg) {
+      resolvedCostEur = parseFloat(pricePerKgOverride) * parseFloat(quantityKg);
+    }
 
     const { rows } = await pool.query(`
       UPDATE stockings SET
-        stocked_at     = COALESCE($1, stocked_at),
-        fish_species   = COALESCE($2, fish_species),
-        quantity_kg    = COALESCE($3, quantity_kg),
-        quantity_count = $4,
-        cost_eur       = $5,
-        source         = $6,
-        age_class      = $7,
-        notes          = $8,
-        updated_at     = NOW()
-      WHERE id = $9
-      RETURNING *,
-        CASE WHEN quantity_kg > 0 AND cost_eur IS NOT NULL
-          THEN ROUND((cost_eur / quantity_kg)::numeric, 2)
-          ELSE NULL END AS price_per_kg
+        stocked_at           = $1,
+        planned_date         = $2,
+        fish_species         = COALESCE($3, fish_species),
+        quantity_kg          = COALESCE($4, quantity_kg),
+        quantity_count       = $5,
+        cost_eur             = $6,
+        price_per_kg_override = $7,
+        source               = $8,
+        age_class            = $9,
+        notes                = $10,
+        is_planned           = COALESCE($11, is_planned),
+        updated_at           = NOW()
+      WHERE id = $12
+      RETURNING *
     `, [
-      stockedAt || null, fishSpecies || null,
+      stockedAt || null,
+      plannedDate || null,
+      fishSpecies || null,
       quantityKg ? parseFloat(quantityKg) : null,
       quantityCount != null ? parseInt(quantityCount) : null,
-      costEur != null ? parseFloat(costEur) : null,
+      resolvedCostEur,
+      pricePerKgOverride != null ? parseFloat(pricePerKgOverride) : null,
       source || null, ageClass || null, notes || null,
+      isPlanned != null ? (isPlanned === true || isPlanned === 'true') : null,
       req.params.id,
     ]);
 
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Besatz nicht gefunden.' });
-    }
+    if (rows.length === 0) return res.status(404).json({ error: 'Besatz nicht gefunden.' });
     res.json(rows[0]);
   } catch (err) {
     console.error('PUT /stockings/:id error:', err);
@@ -205,15 +254,11 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// ── DELETE /api/stockings/:id ────────────────────────────────
+// -- DELETE /api/stockings/:id
 router.delete('/:id', async (req, res) => {
   try {
-    const { rowCount } = await pool.query(
-      'DELETE FROM stockings WHERE id = $1', [req.params.id]
-    );
-    if (rowCount === 0) {
-      return res.status(404).json({ error: 'Besatz nicht gefunden.' });
-    }
+    const { rowCount } = await pool.query('DELETE FROM stockings WHERE id = $1', [req.params.id]);
+    if (rowCount === 0) return res.status(404).json({ error: 'Besatz nicht gefunden.' });
     res.json({ message: 'Besatz geloescht.' });
   } catch (err) {
     console.error('DELETE /stockings/:id error:', err);
