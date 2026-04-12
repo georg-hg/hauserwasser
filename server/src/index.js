@@ -56,6 +56,7 @@ app.use('/api/weather', require('./routes/weather.routes'));
 app.use('/api/monitoring', require('./routes/monitoring.routes'));
 app.use('/api/predators', require('./routes/predators.routes'));
 app.use('/api/revier', require('./routes/revier.routes'));
+app.use('/api/stockings', require('./routes/stockings.routes'));
 
 // ── Error handler ──────────────────────────────────────────
 app.use((err, req, res, next) => {
@@ -133,7 +134,7 @@ async function autoMigrate() {
         ON monitoring_imports(uploaded_at DESC);
     `);
 
-    // Prädatoren-Sichtungen Tabelle
+    // Praedatoren-Sichtungen Tabelle
     await pool.query(`
       CREATE TABLE IF NOT EXISTS predator_sightings (
         id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -166,7 +167,7 @@ async function autoMigrate() {
       END $$;
     `);
 
-    // Gewässerdaten-History (30-Tage-Trend)
+    // Gewaesserdaten-History (30-Tage-Trend)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS water_history (
         id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -180,7 +181,7 @@ async function autoMigrate() {
         ON water_history(station, recorded_at DESC);
     `);
 
-    // last_seen für Online-Status
+    // last_seen fuer Online-Status
     await pool.query(`
       DO $$ BEGIN
         IF NOT EXISTS (
@@ -233,9 +234,53 @@ async function autoMigrate() {
       END $$;
     `);
 
-    console.log('✓ Auto-Migration erfolgreich.');
+    // ── Besatz-Tabelle ──────────────────────────────────────
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stockings (
+        id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        stocked_at      TIMESTAMPTZ NOT NULL,
+        season_year     INTEGER NOT NULL,
+        fish_species    VARCHAR(100) NOT NULL,
+        quantity_kg     DECIMAL(8,2) NOT NULL,
+        quantity_count  INTEGER,
+        source          VARCHAR(255),
+        age_class       VARCHAR(50),
+        notes           TEXT,
+        created_by      UUID REFERENCES users(id) ON DELETE SET NULL,
+        updated_at      TIMESTAMPTZ,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_stockings_season
+        ON stockings(season_year, stocked_at DESC);
+    `);
+
+    // Ersten Besatz eintragen (10.04.2026) falls noch nicht vorhanden
+    await pool.query(`
+      INSERT INTO stockings (stocked_at, season_year, fish_species, quantity_kg, age_class, notes)
+      SELECT '2026-04-10 16:00:00+02'::timestamptz, 2026, 'rainbow_trout', 120, 'fangfertig',
+             'Fruehjahrsbesatz 2026 – 16:00 bis 17:30 Uhr'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM stockings
+        WHERE season_year = 2026
+          AND fish_species = 'rainbow_trout'
+          AND stocked_at::date = '2026-04-10'
+      );
+    `);
+    await pool.query(`
+      INSERT INTO stockings (stocked_at, season_year, fish_species, quantity_kg, age_class, notes)
+      SELECT '2026-04-10 16:00:00+02'::timestamptz, 2026, 'brown_trout', 30, 'fangfertig',
+             'Fruehjahrsbesatz 2026 – 16:00 bis 17:30 Uhr'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM stockings
+        WHERE season_year = 2026
+          AND fish_species = 'brown_trout'
+          AND stocked_at::date = '2026-04-10'
+      );
+    `);
+
+    console.log('Auto-Migration erfolgreich.');
   } catch (err) {
-    console.error('⚠ Auto-Migration Fehler (nicht kritisch):', err.message);
+    console.error('Auto-Migration Fehler (nicht kritisch):', err.message);
   }
 }
 
@@ -243,7 +288,7 @@ async function autoMigrate() {
 async function start() {
   try {
     const { rows } = await pool.query('SELECT NOW()');
-    console.log('✓ PostgreSQL verbunden:', rows[0].now);
+    console.log('PostgreSQL verbunden:', rows[0].now);
 
     // Auto-Migrate: Fischerkarte Wallet Spalte
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS fisher_card_url TEXT').catch(() => {});
@@ -251,10 +296,10 @@ async function start() {
     await autoMigrate();
 
     app.listen(PORT, () => {
-      console.log(`✓ Hauserwasser API läuft auf Port ${PORT}`);
+      console.log(`Hauserwasser API laeuft auf Port ${PORT}`);
     });
   } catch (err) {
-    console.error('✗ Startfehler:', err.message);
+    console.error('Startfehler:', err.message);
     process.exit(1);
   }
 }
