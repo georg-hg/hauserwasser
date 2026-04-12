@@ -12,6 +12,50 @@ function adminOnly(req, res, next) {
 }
 router.use(auth, adminOnly);
 
+// Spalten beim ersten Request sicherstellen (einmalig, idempotent)
+let migrated = false;
+async function ensureNullable() {
+  if (migrated) return;
+  try {
+    await pool.query(`ALTER TABLE stockings ALTER COLUMN stocked_at DROP NOT NULL`).catch(() => {});
+    await pool.query(`ALTER TABLE stockings ALTER COLUMN quantity_kg DROP NOT NULL`).catch(() => {});
+    await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS planned_date DATE`).catch(() => {});
+    await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS is_planned BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
+    await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS price_per_kg_override DECIMAL(8,2)`).catch(() => {});
+    await pool.query(`ALTER TABLE stockings ADD COLUMN IF NOT EXISTS cost_eur DECIMAL(10,2)`).catch(() => {});
+    migrated = true;
+  } catch (e) { /* ignore */ }
+}
+
+// GET /api/stockings/migrate - manuell ausfuehren falls noetig
+router.get('/migrate', async (req, res) => {
+  try {
+    const results = {};
+    const run = async (label, sql) => {
+      try { await pool.query(sql); results[label] = 'ok'; }
+      catch (e) { results[label] = e.message; }
+    };
+    await run('stocked_at nullable',      `ALTER TABLE stockings ALTER COLUMN stocked_at DROP NOT NULL`);
+    await run('quantity_kg nullable',     `ALTER TABLE stockings ALTER COLUMN quantity_kg DROP NOT NULL`);
+    await run('planned_date column',      `ALTER TABLE stockings ADD COLUMN IF NOT EXISTS planned_date DATE`);
+    await run('is_planned column',        `ALTER TABLE stockings ADD COLUMN IF NOT EXISTS is_planned BOOLEAN NOT NULL DEFAULT false`);
+    await run('price_per_kg_override',    `ALTER TABLE stockings ADD COLUMN IF NOT EXISTS price_per_kg_override DECIMAL(8,2)`);
+    await run('cost_eur column',          `ALTER TABLE stockings ADD COLUMN IF NOT EXISTS cost_eur DECIMAL(10,2)`);
+
+    // Tabellen-Struktur zurueckgeben
+    const { rows: cols } = await pool.query(`
+      SELECT column_name, data_type, is_nullable
+      FROM information_schema.columns
+      WHERE table_name = 'stockings'
+      ORDER BY ordinal_position
+    `);
+    migrated = true;
+    res.json({ migrations: results, columns: cols });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const pricePerKgExpr = `
   CASE
     WHEN s.price_per_kg_override IS NOT NULL THEN s.price_per_kg_override
@@ -23,6 +67,7 @@ const pricePerKgExpr = `
 
 // GET /api/stockings
 router.get('/', async (req, res) => {
+  await ensureNullable();
   try {
     const year = req.query.season || new Date().getFullYear();
     const planned = req.query.planned;
@@ -40,12 +85,13 @@ router.get('/', async (req, res) => {
     res.json({ stockings: rows });
   } catch (err) {
     console.error('GET /stockings error:', err);
-    res.status(500).json({ error: 'Besaetze konnten nicht geladen werden.' });
+    res.status(500).json({ error: 'Besaetze konnten nicht geladen werden.', detail: err.message });
   }
 });
 
 // GET /api/stockings/stats
 router.get('/stats', async (req, res) => {
+  await ensureNullable();
   try {
     const year = req.query.season || new Date().getFullYear();
     const { rows: actual } = await pool.query(`
@@ -105,12 +151,13 @@ router.get('/stats', async (req, res) => {
     });
   } catch (err) {
     console.error('GET /stockings/stats error:', err);
-    res.status(500).json({ error: 'Statistik konnte nicht geladen werden.' });
+    res.status(500).json({ error: 'Statistik konnte nicht geladen werden.', detail: err.message });
   }
 });
 
 // POST /api/stockings
 router.post('/', async (req, res) => {
+  await ensureNullable();
   try {
     const {
       stockedAt, plannedDate, fishSpecies, quantityKg, quantityCount,
@@ -119,7 +166,6 @@ router.post('/', async (req, res) => {
 
     const planned = isPlanned === true || isPlanned === 'true';
 
-    // Pflichtfelder: nur Fischart zwingend; Menge optional bei Planung
     if (!fishSpecies) {
       return res.status(400).json({ error: 'Fischart ist ein Pflichtfeld.' });
     }
@@ -127,12 +173,9 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Datum ist Pflichtfeld fuer Ist-Besatz.' });
     }
 
-    const effectiveDate = planned
-      ? (plannedDate || new Date().toISOString())
-      : stockedAt;
+    const effectiveDate = planned ? (plannedDate || new Date().toISOString()) : stockedAt;
     const seasonYear = new Date(effectiveDate).getFullYear();
 
-    // Kosten aus Kilopreis x Menge berechnen wenn noetig
     let resolvedCostEur = costEur ? parseFloat(costEur) : null;
     if (!resolvedCostEur && pricePerKgOverride && quantityKg) {
       resolvedCostEur = parseFloat(pricePerKgOverride) * parseFloat(quantityKg);
@@ -148,15 +191,13 @@ router.post('/', async (req, res) => {
     `, [
       planned ? null : stockedAt,
       plannedDate || null,
-      seasonYear,
-      fishSpecies,
+      seasonYear, fishSpecies,
       quantityKg ? parseFloat(quantityKg) : null,
       quantityCount ? parseInt(quantityCount) : null,
       resolvedCostEur,
       pricePerKgOverride ? parseFloat(pricePerKgOverride) : null,
       source || null, ageClass || null, notes || null,
-      planned,
-      req.user.id,
+      planned, req.user.id,
     ]);
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -167,6 +208,7 @@ router.post('/', async (req, res) => {
 
 // PUT /api/stockings/:id
 router.put('/:id', async (req, res) => {
+  await ensureNullable();
   try {
     const {
       stockedAt, plannedDate, fishSpecies, quantityKg, quantityCount,
@@ -195,9 +237,7 @@ router.put('/:id', async (req, res) => {
       WHERE id = $12
       RETURNING *
     `, [
-      stockedAt || null,
-      plannedDate || null,
-      fishSpecies || null,
+      stockedAt || null, plannedDate || null, fishSpecies || null,
       quantityKg != null && quantityKg !== '' ? parseFloat(quantityKg) : null,
       quantityCount != null && quantityCount !== '' ? parseInt(quantityCount) : null,
       resolvedCostEur,
