@@ -18,6 +18,7 @@ import Renaturierung from './components/renaturierung/Renaturierung';
 import Revier from './components/revier/Revier';
 import Profile from './components/profile/Profile';
 import InstallPrompt from './components/pwa/InstallPrompt';
+import PublicMonitoring from './components/monitoring/PublicMonitoring';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -63,6 +64,9 @@ export default function App() {
 
       <main className={user ? 'pb-20 md:pb-6' : ''}>
         <Routes>
+          {/* Öffentlich, ohne Login */}
+          <Route path="/monitoring" element={<PublicMonitoring />} />
+
           {/* Auth */}
           <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
           <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />

@@ -37,6 +37,9 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (request.method !== 'GET') return;
 
+  // Öffentliches Trübungsmonitoring immer frisch vom Netz laden (kein Cache)
+  if (url.pathname === '/truebungsmonitoring.html') return;
+
   // API calls: network-first with timeout fallback
   if (url.pathname.startsWith('/api') || url.hostname !== self.location.hostname) {
     event.respondWith(
