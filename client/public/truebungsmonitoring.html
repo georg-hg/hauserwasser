@@ -130,6 +130,29 @@ button { font-family: inherit; }
 .rows-head { display: grid; grid-template-columns: minmax(170px,1.3fr) minmax(0,1fr) 86px auto; gap: 0 20px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--s400); padding: 8px 0 0; }
 .rows-head span { text-align: right; } .rows-head span:first-child { text-align: left; } .rows-head span:last-child { min-width: 92px; }
 @media (max-width: 700px) { .row, .rows-head { grid-template-columns: minmax(0,1fr) 70px auto; } .row-span, .rows-head .h-span { display: none; } }
+.ph-day { margin-top: 26px; }
+.ph-day:first-child { margin-top: 18px; }
+.ph-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; border-bottom: 1px solid var(--s200); padding-bottom: 6px; }
+.ph-head b { font-size: 13px; font-weight: 600; color: var(--s950); }
+.ph-head span { font-family: var(--mono); font-size: 11.5px; color: var(--s600); font-variant-numeric: tabular-nums; }
+.ph-head i { font-style: normal; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+.ph-head button { margin-left: auto; border: 0; background: none; font-family: var(--mono); font-size: 11.5px; color: var(--s500); cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 2px; }
+.ph-head button:hover { color: var(--s950); }
+.ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; margin-top: 12px; }
+.ph-item { margin: 0; min-width: 0; }
+.ph-item button { display: block; width: 100%; aspect-ratio: 4 / 3; border: 0; padding: 0; background: var(--s100); cursor: zoom-in; overflow: hidden; }
+.ph-item button:focus-visible { outline: 2px solid var(--s950); outline-offset: 2px; }
+.ph-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ph-item figcaption { font-size: 12px; line-height: 1.45; color: var(--s600); margin-top: 6px; overflow-wrap: anywhere; }
+.ph-item figcaption b { font-family: var(--mono); font-weight: 600; color: var(--s950); font-variant-numeric: tabular-nums; }
+.ph-box { position: fixed; inset: 0; z-index: 100; background: rgba(2, 6, 23, 0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+.ph-box[hidden] { display: none; }
+.ph-box img { max-width: 100%; max-height: calc(100vh - 150px); display: block; }
+.ph-box p { color: #e2e8f0; font-size: 13px; line-height: 1.5; margin-top: 12px; text-align: center; max-width: 60em; overflow-wrap: anywhere; }
+.ph-box p b { font-family: var(--mono); font-weight: 600; color: #fff; }
+.ph-nav { display: flex; gap: 8px; margin-top: 12px; }
+.ph-nav button { border: 1px solid #475569; background: none; color: #e2e8f0; font-family: var(--mono); font-size: 12px; padding: 6px 12px; cursor: pointer; }
+.ph-nav button:hover { border-color: #e2e8f0; }
 .sec-t { margin-top: 56px; gap: 40px; align-items: start; border-top: 1px solid var(--s900); padding-top: 18px; }
 .takt-text { font-size: 12.5px; line-height: 1.55; color: var(--s700); margin-top: 12px; max-width: 40em; }
 .takt { overflow-x: auto; }
@@ -480,6 +503,15 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--s9
     </div>
   </section>
 
+  <section class="grid sec-t" id="secPhotos">
+    <div class="c12">
+      <h2>Fotodokumentation</h2>
+      <p class="sub" id="phSub">Fotos der Krems im Revier Hauserwasser, Tag für Tag</p>
+      <p class="takt-text">Die Fotos zeigen den sichtbaren Zustand des Wassers am jeweiligen Tag. Neben dem Datum stehen die Tagesmittel der Trübung an den Stationen, soweit für diesen Tag Messwerte vorliegen. Ein Klick auf ein Foto öffnet es groß.</p>
+      <div id="phList"></div>
+    </div>
+  </section>
+
   <section class="grid sec-c">
     <div class="c5">
       <h2>Einordnung: Grenzwert, Messbereich, Vergleich</h2>
@@ -505,7 +537,13 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--s9
     </div>
   </section>
 
-  <footer class="footer">Stand 24.11.2026 · Messdaten bis <span id="dataTo"></span> · Trübung: TB Zauner Sonden · Niederschlag und Temperatur: GeoSphere Austria (CC BY 4.0) · Abfluss, Pegel, Wassertemperatur und Niederschlag Neuhofen: Hydrographischer Dienst OÖ · Auftraggeber: Georg Hauser, Hauserwasser</footer>
+  <div class="ph-box" id="phBox" hidden role="dialog" aria-modal="true" aria-label="Foto">
+    <img id="phBig" alt="">
+    <p id="phCap"></p>
+    <div class="ph-nav"><button type="button" id="phPrev">← Zurück</button><button type="button" id="phNext">Weiter →</button><button type="button" id="phClose">Schließen</button></div>
+  </div>
+
+  <footer class="footer">Stand 24.11.2026 · Messdaten bis <span id="dataTo"></span> · Trübung: TB Zauner Sonden · Niederschlag und Temperatur: GeoSphere Austria (CC BY 4.0) · Abfluss, Pegel, Wassertemperatur und Niederschlag Neuhofen: Hydrographischer Dienst OÖ · Fotos: Georg Hauser · Auftraggeber: Georg Hauser, Hauserwasser</footer>
 </main>
 
 <script>
@@ -1376,6 +1414,98 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
     });
   }
 
+  /* ---------- Fotodokumentation ---------- */
+  var PHOTO_API = 'https://hauserwasser-api.onrender.com';
+  var photos = null, photoErr = false, phShown = [], phIdx = -1;
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function dayVal(st, date) { var v = null; srcData(st).some(function (x) { if (x.date === date) { v = x; return true; } return false; }); return v && v.readings ? v.avgNtu : null; }
+  function phDay(d) { return ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'][toDate(d).getDay()] + ', ' + dmy(d); }
+  function phLabel(ph) { return phDay(ph.date) + (ph.time ? ', ' + ph.time + ' Uhr' : ''); }
+  function loadPhotos() {
+    if (!window.fetch) { photoErr = true; renderPhotos(); return; }
+    fetch(PHOTO_API + '/api/monitoring-photos', { credentials: 'omit' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) {
+        photos = (j.photos || []).filter(function (x) { return x && /^[0-9a-f-]{36}$/i.test(x.id) && /^\d{4}-\d{2}-\d{2}$/.test(x.date); });
+        photoErr = false; renderPhotos();
+      })
+      .catch(function () { photoErr = true; renderPhotos(); });
+  }
+  function renderPhotos() {
+    var box = document.getElementById('phList'), sub = document.getElementById('phSub');
+    box.textContent = ''; phShown = [];
+    if (photos == null) {
+      box.appendChild(el('p', 'takt-text', photoErr
+        ? 'Die Fotos konnten gerade nicht geladen werden. Sie liegen auf dem Server der Hauserwasser-App und erscheinen in der veröffentlichten Fassung unter hauserwasser-client.onrender.com/monitoring. Der Server braucht nach einer Pause bis zu einer Minute zum Starten; danach bitte die Seite neu laden.'
+        : 'Fotos werden geladen …'));
+      return;
+    }
+    var from = periodStart();
+    var list = photos.filter(function (x) { return x.date >= from; });
+    var nDays = {}; list.forEach(function (x) { nDays[x.date] = 1; });
+    sub.textContent = list.length
+      ? list.length + (list.length === 1 ? ' Foto' : ' Fotos') + ' an ' + Object.keys(nDays).length + (Object.keys(nDays).length === 1 ? ' Tag' : ' Tagen') + ' im gewählten Zeitraum' + (photos.length > list.length ? ' · ' + photos.length + ' insgesamt' : '')
+      : 'Fotos der Krems im Revier Hauserwasser, Tag für Tag';
+    if (!list.length) { box.appendChild(el('p', 'takt-text', photos.length ? 'Im gewählten Zeitraum liegen keine Fotos vor.' : 'Noch keine Fotos vorhanden.')); return; }
+    var cur = null, grid = null;
+    list.forEach(function (ph) {
+      if (ph.date !== cur) {
+        cur = ph.date;
+        var day = el('div', 'ph-day'), head = el('div', 'ph-head');
+        head.appendChild(el('b', null, phDay(ph.date)));
+        var any = false;
+        ORDER.forEach(function (st) {
+          if (!vis(st)) return;
+          var v = dayVal(st, ph.date); if (v == null) return;
+          var s = el('span'), dot = el('i'); dot.style.background = COL[st];
+          s.appendChild(dot); s.appendChild(document.createTextNode(NAME[st] + mkT(st) + ' ' + num(v, v < 10 ? 1 : 0) + ' NTU'));
+          head.appendChild(s); any = true;
+        });
+        if (!any) head.appendChild(el('span', null, ph.date > maxDate ? 'Messwerte für diesen Tag noch nicht eingespielt' : 'keine Messwerte für diesen Tag'));
+        else if (ph.date >= minDate && ph.date <= maxDate) {
+          var b = el('button', null, 'Tag im Diagramm zeigen'); b.type = 'button';
+          (function (d) { b.addEventListener('click', function () { setPin(d); document.getElementById('dayInput').scrollIntoView({ block: 'start' }); }); })(ph.date);
+          head.appendChild(b);
+        }
+        grid = el('div', 'ph-grid');
+        day.appendChild(head); day.appendChild(grid); box.appendChild(day);
+      }
+      var i = phShown.length; phShown.push(ph);
+      var fig = el('figure', 'ph-item'), btn = el('button'), img = el('img'), cap = el('figcaption');
+      btn.type = 'button'; btn.setAttribute('aria-label', 'Foto vom ' + phLabel(ph) + ' groß anzeigen');
+      img.loading = 'lazy'; img.alt = ph.note || 'Foto der Krems vom ' + phLabel(ph);
+      img.src = PHOTO_API + '/api/monitoring-photos/' + ph.id + '/thumb';
+      btn.appendChild(img); btn.addEventListener('click', function () { openPhoto(i); });
+      cap.appendChild(el('b', null, ph.time ? ph.time + ' Uhr' : 'ohne Uhrzeit'));
+      if (ph.location) cap.appendChild(document.createTextNode(' · ' + ph.location));
+      if (ph.note) { cap.appendChild(el('br')); cap.appendChild(document.createTextNode(ph.note)); }
+      fig.appendChild(btn); fig.appendChild(cap); grid.appendChild(fig);
+    });
+  }
+  function openPhoto(i) {
+    if (!phShown.length) return;
+    phIdx = (i + phShown.length) % phShown.length;
+    var ph = phShown[phIdx], cap = document.getElementById('phCap');
+    document.getElementById('phBig').src = PHOTO_API + '/api/monitoring-photos/' + ph.id + '/image';
+    document.getElementById('phBig').alt = ph.note || 'Foto der Krems vom ' + phLabel(ph);
+    cap.textContent = '';
+    cap.appendChild(el('b', null, phLabel(ph)));
+    if (ph.location) cap.appendChild(document.createTextNode(' · ' + ph.location));
+    if (ph.note) { cap.appendChild(el('br')); cap.appendChild(document.createTextNode(ph.note)); }
+    document.getElementById('phPrev').hidden = document.getElementById('phNext').hidden = phShown.length < 2;
+    document.getElementById('phBox').hidden = false;
+    document.getElementById('phClose').focus();
+  }
+  function closePhoto() { document.getElementById('phBox').hidden = true; document.getElementById('phBig').removeAttribute('src'); phIdx = -1; }
+  document.getElementById('phClose').addEventListener('click', closePhoto);
+  document.getElementById('phPrev').addEventListener('click', function () { openPhoto(phIdx - 1); });
+  document.getElementById('phNext').addEventListener('click', function () { openPhoto(phIdx + 1); });
+  document.getElementById('phBox').addEventListener('click', function (e) { if (e.target === this) closePhoto(); });
+  document.addEventListener('keydown', function (e) {
+    if (phIdx < 0) return;
+    if (e.key === 'Escape') closePhoto(); else if (e.key === 'ArrowLeft') openPhoto(phIdx - 1); else if (e.key === 'ArrowRight') openPhoto(phIdx + 1);
+  });
+
   function render() {
     qRef = qStats().med;
     var F = filtered(), S = {};
@@ -1386,7 +1516,7 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
     var ks = Object.keys(cnt).sort(), full = ks.filter(function (k) { return cnt[k] === ORDER.length; });
     mapDefault = full.length ? full[full.length - 1] : ks[ks.length - 1]; mapKey = undefined;
     curKeys = ks;
-    curS = S; renderLead(S); renderStats(S); renderNotes(S); renderSim(S); renderTakt(F); renderRain(F); renderWeather(); renderQ(F); renderWT(); renderPlaus(); renderPattern(F); showMap(null); renderLegend(); renderLine(P); drawHeat(); renderBars(F);
+    curS = S; renderLead(S); renderStats(S); renderNotes(S); renderSim(S); renderTakt(F); renderRain(F); renderWeather(); renderQ(F); renderWT(); renderPlaus(); renderPattern(F); renderPhotos(); showMap(null); renderLegend(); renderLine(P); drawHeat(); renderBars(F);
   }
   function pinKey() { return !pinned ? null : view === 'weekly' ? monday(pinned) : view === 'monthly' ? pinned.slice(0, 7) : pinned; }
   function showMap(k) {
@@ -1446,6 +1576,7 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setRef(false); });
 
   render();
+  loadPhotos();
 })();
 </script>
 </body>

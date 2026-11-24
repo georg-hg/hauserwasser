@@ -6,10 +6,12 @@ import MonitoringSection from './MonitoringSection';
 import ProjekteckdatenSection from './ProjekteckdatenSection';
 import ProjektzielSection from './ProjektzielSection';
 import DokumentationSection from './DokumentationSection';
+import FotodokuSection from './FotodokuSection';
 
 const ALL_TABS = [
   { id: 'datenserver', label: 'Datenserver', adminOnly: true, icon: 'M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z' },
   { id: 'monitoring', label: 'Monitoring', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+  { id: 'fotos', label: 'Fotodokumentation', icon: 'M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316zM16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z' },
   { id: 'eckdaten', label: 'Projekteckdaten', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
   { id: 'ziel', label: 'Projektziel', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
   { id: 'dokumentation', label: 'Prädatoren', icon: 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178zM15 12a3 3 0 11-6 0 3 3 0 016 0z' },
@@ -76,6 +78,7 @@ export default function Renaturierung() {
       {/* Tab Content */}
       {activeTab === 'datenserver' && isAdmin && <DatenserverSection />}
       {activeTab === 'monitoring' && <MonitoringSection />}
+      {activeTab === 'fotos' && <FotodokuSection isAdmin={isAdmin} />}
       {activeTab === 'dokumentation' && <DokumentationSection />}
       {activeTab === 'eckdaten' && <ProjekteckdatenSection />}
       {activeTab === 'ziel' && <ProjektzielSection />}

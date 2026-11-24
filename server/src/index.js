@@ -32,6 +32,9 @@ const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, max: 200,
   message: { error: 'Zu viele Anfragen - bitte warte kurz.' },
 });
+// Fotodokumentation: eigene Limits (viele Vorschaubilder), daher vor dem allgemeinen Limiter
+app.use('/api/monitoring-photos', require('./routes/monitoring-photos.routes'));
+
 app.use('/api/', apiLimiter);
 
 app.use('/api/auth',         require('./routes/auth.routes'));
@@ -85,6 +88,10 @@ async function autoMigrate() {
     await pool.query(`INSERT INTO stockings (season_year, fish_species, price_per_kg_override, source, age_class, is_planned, notes) SELECT 2026, 'carp', 9.00, 'Fischzucht Maier', 'fangfertig', true, 'Besatzplanung 2026 - Menge und Termin noch offen - EUR 9.00/kg' WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='carp' AND is_planned=true);`);
     await pool.query(`INSERT INTO stockings (season_year, fish_species, is_planned, notes) SELECT 2026, 'perch', true, 'Besatzplanung 2026 - Menge, Termin und Preis noch offen' WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='perch' AND is_planned=true);`);
     await pool.query(`INSERT INTO stockings (season_year, fish_species, is_planned, notes) SELECT 2026, 'pike', true, 'Besatzplanung 2026 - Menge, Termin und Preis noch offen' WHERE NOT EXISTS (SELECT 1 FROM stockings WHERE season_year=2026 AND fish_species='pike' AND is_planned=true);`);
+
+    const photos = require('./routes/monitoring-photos.routes');
+    await photos.migrate();
+    await photos.seed().catch((e) => console.error('Foto-Seed Fehler (nicht kritisch):', e.message));
 
     console.log('Auto-Migration erfolgreich.');
   } catch (err) {
