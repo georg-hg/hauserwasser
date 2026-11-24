@@ -119,6 +119,12 @@ button { font-family: inherit; }
 .row-val span { font-size: 12px; font-weight: 400; color: var(--s400); margin-left: 4px; }
 .row-fac { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--s950); font-variant-numeric: tabular-nums; text-align: right; }
 .row-fac.ref { font-weight: 400; color: var(--s400); }
+.row.fault .row-name, .row.fault .row-val, .row.fault .row-span { color: var(--s400); }
+.row.fault .row-val { text-decoration: line-through; text-decoration-thickness: 1px; }
+.row.fault .row-val span { text-decoration: none; display: inline-block; }
+.fault-tag { display: inline-block; font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #B91C1C; border: 1px solid #B91C1C; border-radius: 3px; padding: 0 5px; margin-left: 6px; }
+.matrix tr.fault td { color: var(--s400) !important; }
+.matrix tr.fault td.avg span { text-decoration: line-through; }
 .row-bar { grid-column: 1 / -1; height: 3px; background: var(--s100); }
 .row-bar i { display: block; height: 3px; }
 .rows-head { display: grid; grid-template-columns: minmax(170px,1.3fr) minmax(0,1fr) 86px auto; gap: 0 20px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--s400); padding: 8px 0 0; }
@@ -130,6 +136,16 @@ button { font-family: inherit; }
 .takt table { border-top: 0; margin-top: 0; }
 .takt td.hi { color: var(--s950); font-weight: 600; }
 @media (min-width: 1024px) { .c12 { grid-column: 1 / -1; } }
+.seg button.tg[aria-pressed="true"] { background: var(--s900); color: #fff; }
+.sim-tag { display: inline-block; font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--s950); border: 1px dashed var(--s700); border-radius: 3px; padding: 0 5px; margin-left: 6px; font-family: var(--sans); }
+.sim-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 16px; }
+.sim-ctl label { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--s700); }
+.sim-ctl label b { font-family: var(--mono); font-weight: 600; color: var(--s950); font-variant-numeric: tabular-nums; }
+.sim-ctl input[type=range] { width: 100%; margin: 4px 0 0; accent-color: #0f172a; }
+.sim-out { margin-top: 18px; border-top: 1px solid var(--s900); }
+.sim-out div { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--s200); font-size: 12.5px; color: var(--s700); }
+.sim-out div b { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--s950); font-weight: 600; text-align: right; }
+.sim-out div.big b { font-size: 18px; }
 .sec-c { margin-top: 56px; gap: 40px; align-items: start; border-top: 1px solid var(--s900); padding-top: 18px; }
 .sec-c h2 { margin-bottom: 4px; }
 .note-list { margin-top: 10px; }
@@ -210,6 +226,9 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--s9
       <button data-view="daily" class="active">Tagesmittel</button><button data-view="weekly">Wochenmittel</button><button data-view="monthly">Monatsmittel</button>
     </div>
     <div class="day"><label for="dayInput">Tag</label><input type="date" id="dayInput" aria-label="Konkreten Tag auswählen"><button id="dayClear" hidden aria-label="Tagesauswahl aufheben">Zurücksetzen</button></div>
+    <div class="seg" role="group" aria-label="Station Hauserwasser">
+      <button data-hw="meas" class="active" title="Originalwerte der Sonde Hauserwasser anzeigen">Hauserwasser: Messwerte</button><button data-hw="off" title="Die Sonde ist fehlerhaft: ihre Werte in allen Diagrammen und Vergleichen ausblenden">Sonde (fehlerhaft)</button><button data-hw="sim" title="Alle Werte der Station durch die Modellrechnung aus Station Mitte ersetzen">Simulation</button>
+    </div>
     <div class="ref">
       <button class="ref-trigger" id="refBtn" aria-expanded="false" aria-controls="refPop">[Referenzwerte NTU]</button>
       <div class="ref-pop" id="refPop" role="dialog" aria-label="Referenzwerte NTU">
@@ -247,7 +266,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--s9
       <span class="eyebrow" id="rowsEyebrow"></span>
       <div class="rows-head"><span>Station</span><span class="h-span">Spanne</span><span>Faktor zu Krems</span><span>NTU</span></div>
       <div id="rows"></div>
-      <p class="period-note" style="margin-top:10px;max-width:none">† Hauserwasser: Messwerte unter Vorbehalt. Ein Problem mit der Sonde bei Fischen ist möglich und wird mit TB Zauner geklärt (siehe Einordnung).</p>
+      <p class="period-note" id="hwNote" style="margin-top:10px;max-width:none"></p>
     </div>
   </section>
 
@@ -272,7 +291,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--s9
         <g id="mapSections"></g>
         <g id="mapStations"></g>
       </svg>
-      <p class="footnote">Schematisch, nicht maßstabsgetreu. Standorte 1–4 laut Technischem Bericht ezb – TB Zauner vom 03.09.2025. Die Station «Hauserwasser» entspricht der Sonde «Ende» in den Messdateien. Die Lage der Abschnittsgrenzen ist schematisch.</p>
+      <p class="footnote">Schematisch, nicht maßstabsgetreu. Standorte 1–4 laut Technischem Bericht ezb – TB Zauner vom 03.09.2025. Die Station «Hauserwasser» entspricht der Sonde «Ende» in den Messdateien; sie liegt rund 1,8 Flusskilometer unterhalb der Station Mitte am oberen Ende des Reviers und ist fehlerhaft. Die Lage der Abschnittsgrenzen ist schematisch.</p>
     </div>
     <div class="c7 panel p8">
       <div class="card-head">
@@ -293,6 +312,38 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--s9
         <span><i style="background:#7F1D1D"></i>&gt; 500 Extrem trüb</span>
         <span><i style="background:#f1f5f9;border:1px solid #e2e8f0"></i>keine Daten</span>
       </div>
+    </div>
+  </section>
+
+  <section class="grid sec-t">
+    <div class="c5">
+      <h2>Simulation: Abnahme der Schwebstoffe auf dem Weg ins Revier</h2>
+      <p class="sub">Modellrechnung, keine Messung · Station Mitte am Projektende als Ausgangswert</p>
+      <p class="takt-text" style="margin-top:10px">Mit «Simulation» in der Steuerleiste werden alle Werte der Station Hauserwasser im gesamten Dashboard durch diese Modellrechnung ersetzt. Änderungen an den Reglern wirken dann sofort überall.</p>
+      <div class="seg sm" role="group" aria-label="Korngröße wählen" style="margin-top:14px">
+        <button data-grain="2">Ton 2 µm</button><button data-grain="10" class="active">Feinschluff 10 µm</button><button data-grain="20">Mittelschluff 20 µm</button><button data-grain="63">Grobschluff 63 µm</button>
+      </div>
+      <div class="sim-grid sim-ctl">
+        <div><label for="simD">Korngröße <b id="simDv"></b></label><input type="range" id="simD" min="0" max="100" step="1"></div>
+        <div><label for="simX">Stelle im Revier <b id="simXv"></b></label><input type="range" id="simX" min="1800" max="4800" step="100"></div>
+        <div><label for="simB">Gewässerbreite <b id="simBv"></b></label><input type="range" id="simB" min="10" max="40" step="1"></div>
+      </div>
+      <div class="sim-out">
+        <div><span>Sinkgeschwindigkeit (nach Stokes)</span><b id="simVs"></b></div>
+        <div><span>Abfluss im Zeitraum (Median, Kremsmünster + Sulzbach)</span><b id="simQ"></b></div>
+        <div><span>Strecke, nach der noch 37 % übrig sind (bei Median-Abfluss)</span><b id="simL"></b></div>
+        <div><span>Anteil bei Niedrigwasser / Median / höherem Abfluss</span><b id="simF3"></b></div>
+        <div class="big"><span>Anteil, der im Mittel ankommt</span><b id="simF"></b></div>
+        <div class="big"><span>Station Mitte im Zeitraum → Simulation</span><b id="simAvg"></b></div>
+        <div><span>Bandbreite Mittelschluff 20 µm bis Ton 2 µm</span><b id="simBand"></b></div>
+      </div>
+      <p class="cap" style="font-size:11px;color:var(--s500);margin-top:10px;line-height:1.5">Revierdaten laut Fischereibuch (Ordnungsnummer 30/5, Krems samt Fischlmayrbach): Länge ca. 3.000 m, Breite ca. 25 m, Untergrenze bei Fluss-km 17,070. Die Obergrenze liegt rund 1,8 Flusskilometer unterhalb der Station Mitte, die Untergrenze rund 4,8. Die Sonde Hauserwasser steht nach den Lageplänen etwa 45 m neben der Obergrenze.</p>
+    </div>
+    <div class="c7 panel p7">
+      <h2>Verbleibender Anteil entlang der Fließstrecke</h2>
+      <p class="sub" id="simSub"></p>
+      <div class="chart-bar" style="height:320px;margin-top:14px"><canvas id="chartSim"></canvas></div>
+      <p class="footnote">Rechenweg: verbleibender Anteil = e^(−Strecke × Breite × Sinkgeschwindigkeit ÷ Abfluss), für jeden Tag mit dem gemessenen Abfluss (Summe der Pegel Kremsmünster und Unterrohr; für Tage ohne Pegelwert der Mittelwert). Annahmen: gleichmäßiges Absinken eines einheitlichen Korns in ruhigem Wasser (Stokes, Korndichte 2,65 g/cm³, Wasser 20 °C), keine Aufwirbelung durch Turbulenz, keine Verdünnung durch Zuflüsse, gleichbleibende Breite. Die Rechnung überschätzt die Abnahme daher eher. Die Korngröße ist frei gewählt und nicht an der Krems gemessen; die Breite stammt aus dem Fischereibuch und gilt für das Revier. Die Simulation ersetzt keine Messung; sie zeigt die Größenordnung, in der sich Schwebstoffe auf 1,8 km absetzen können. Abgesetztes Material bleibt im Gewässerbett und kann bei höherem Abfluss wieder aufgewirbelt werden.</p>
     </div>
   </section>
 
@@ -402,8 +453,8 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--s9
       <p class="sub" style="margin:6px 0 2px">Bewegen sich zwei Stationen gemeinsam auf und ab?</p>
       <table id="corrTab"><thead><tr><th>Von → nach</th><th>bis Mitte Mai 2026</th><th>seit Mitte Mai 2026</th></tr></thead><tbody></tbody></table>
       <p class="cap">Kennzahl von −1 bis 1 aus den Stundenwerten, mit bis zu 24 Stunden Fließverzug. Nahe 1: die Kurven steigen und fallen gemeinsam. Nahe 0: kein Zusammenhang. Mitte Mai 2026 begannen die Arbeiten im Wasser.</p>
-      <p class="takt-text">Was flussaufwärts vorbeikommt, muss kurz darauf flussabwärts ankommen. Vor Baubeginn lief Mitte erkennbar mit Krems mit. Seit Baubeginn folgt Mitte stärker dem Sulzbach, in dessen Bereich gebaut wird. Hauserwasser† läuft in beiden Zeiträumen mit keiner Station mit, auch nicht mit Mitte, die nur rund 1,5 km oberhalb liegt.</p>
-      <p class="takt-text">Zusammen mit dem hohen Grundniveau spricht das dafür, dass die Sonde Hauserwasser nicht die Trübung abbildet, die aus dem Projektgebiet kommt. Für den Zufluss in das Revier ist die Station Mitte am Projektende die verlässlichere Messstelle.</p>
+      <p class="takt-text">Was flussaufwärts vorbeikommt, muss kurz darauf flussabwärts ankommen. Vor Baubeginn lief Mitte erkennbar mit Krems mit. Seit Baubeginn folgt Mitte stärker dem Sulzbach, in dessen Bereich gebaut wird. Hauserwasser† läuft in beiden Zeiträumen mit keiner Station mit, auch nicht mit Mitte, die nur rund 1,8 Flusskilometer oberhalb liegt.</p>
+      <p class="takt-text">Zusammen mit dem hohen Grundniveau spricht das dafür, dass die Sonde Hauserwasser nicht die Trübung abbildet, die aus dem Projektgebiet kommt. Die Sonde wurde inzwischen als fehlerhaft festgestellt und wird getauscht. Für den Zufluss in das Revier ist die Station Mitte am Projektende, rund 1,8 Flusskilometer oberhalb, die einzige verwertbare Messstelle.</p>
     </div>
   </section>
 
@@ -448,7 +499,7 @@ h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--s9
         <div><span class="k">Messbereich</span><span>Die Sonden zeichnen höchstens rund <b>1.050 NTU</b> auf (≈ 4,2 g/l). Höhere Werte, und damit auch eine Überschreitung des Grenzwerts, sind in den Daten nicht darstellbar. <span id="capText"></span></span></div>
         <div><span class="k">Vergleich Inn</span><span>Die Projektinformation nennt als Vergleich den Inn bei Schärding im Hochwasser 2013 mit <b>17 g/l</b> im Scheitel. Der Grenzwert der Bauphase entspricht rund 30 %, der Tageshöchstwert rund 60 % dieses Werts. Ein Hochwasserscheitel dauert Stunden bis Tage; die Bauarbeiten laufen laut Bauzeitplan bis August 2027.</span></div>
         <div><span class="k">Kein Hochwasser</span><span>Nach Angabe des Fischereiberechtigten gab es im gesamten Messzeitraum <b>kein Hochwasser</b>; das letzte große Hochwasser war um den 14.09.2024, also vor Beginn der Aufzeichnung. Dazu passt die Referenzstation Krems am Projektbeginn: <span id="floodText"></span> Die hohen Werte an den Stationen unterhalb sind daher nicht mit Hochwasser zu erklären. Die Niederschlagsdaten von GeoSphere Austria stützen das: Der höchste Tagesniederschlag in Kremsmünster lag im gesamten Messzeitraum bei 28 mm. Die amtlichen Pegel oberhalb und unterhalb des Reviers bestätigen es für den öffentlich abrufbaren Zeitraum 24.11.2025 bis 23.11.2026: In Kremsmünster lag der höchste Wasserstand bei <b>179 cm</b> (Voralarm ab 245 cm), in Kremsdorf bei <b>298 cm</b> (Voralarm ab 380 cm), am Sulzbach in Unterrohr bei 237 cm (Voralarm ab 330 cm). Für September bis November 2025 liegt kein öffentlicher Pegelauszug vor.</span></div>
-        <div><span class="k">Station Hauserwasser†</span><span>Die Sonde bei Fischen liegt dauerhaft weit über jener am Projektende in Kematen, obwohl dazwischen kein Bauabschnitt liegt, und zeigt keinen Unterschied zwischen Werktag und Wochenende. Laut ökologischer Baubegleitung (Gespräch vom 20.11.2026) ist ein <b>Problem mit der Sonde möglich</b>; die Klärung ist offen. Die Werte dieser Station und der daraus berechnete Faktor sind bis dahin unter Vorbehalt zu lesen.</span></div>
+        <div><span class="k">Station Hauserwasser†</span><span>Die Sonde bei Fischen, rund 1,8 Flusskilometer unterhalb des Projektendes und nach den Lageplänen etwa 45 m neben der im Fischereibuch festgelegten Obergrenze des Reviers, ist <b>fehlerhaft und wird getauscht</b> (Stand 24.11.2026). Der Fehler besteht vermutlich seit Beginn der Aufzeichnung im September 2025. Die Auswertung hatte darauf hingewiesen: Die Werte liefen mit keiner anderen Station, mit dem Abfluss oder dem Wetter mit und zeigten ein eigenes Muster aus langsamem Anstieg und plötzlichem Abfall (siehe Plausibilität 1 bis 3). Die Werte sind <b>nicht verwertbar</b>. Sie werden in der Grundansicht als Originalwerte gezeigt und lassen sich in der Steuerleiste ausblenden oder durch eine Simulation ersetzen. Damit liegt für den Abschnitt unterhalb des Projektgebiets seit Beginn der Messung keine verwertbare Trübungsmessung vor.</span></div>
         <div><span class="k">Stufen</span><span>Die Stufen «Klar» bis «Extrem trüb» und die Linien bei 50 und 200 NTU sind Orientierungswerte dieser Auswertung, keine amtliche Einteilung.</span></div>
       </div>
     </div>
@@ -468,7 +519,7 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
   var ORDER = ['Krems', 'Sulzbach', 'Mitte', 'Ende'];
   var NAME = { Krems: 'Krems', Sulzbach: 'Sulzbach', Mitte: 'Mitte', Ende: 'Hauserwasser' };
   var ROLE = { Krems: 'Projektbeginn Achleiten', Sulzbach: 'Zufluss', Mitte: 'Projektende Krems – Kematen', Ende: 'Krems in Piberbach – Fischen' };
-  var LABEL = { Krems: 'Krems (Projektbeginn Achleiten)', Sulzbach: 'Sulzbach (Zufluss)', Mitte: 'Mitte (Projektende Krems – Kematen)', Ende: 'Hauserwasser (Krems in Piberbach – Fischen)' };
+  var LABEL = { Krems: 'Krems (Projektbeginn Achleiten)', Sulzbach: 'Sulzbach (Zufluss)', Mitte: 'Mitte (Projektende Krems – Kematen)', Ende: 'Hauserwasser (Krems in Piberbach – Fischen)†' };
   var MON = ['Jän', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
   var RANGE_TXT = { 30: 'letzte 30 Tage', 90: 'letzte 3 Monate', 180: 'letzte 6 Monate', 365: 'letztes Jahr', 0: 'gesamter Messzeitraum' };
   var VIEW_TXT = { daily: 'Tagesmittel', weekly: 'Wochenmittel', monthly: 'Monatsmittel' };
@@ -477,7 +528,40 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
 
   var range = 365, view = 'daily', hidden = {}, chartNtu = null, chartMonthly = null, mapPos = null, mapIdx = {}, mapDefault = null, mapKey, mapLive, pinned = null, focus = null, mode = 'line', scale = 'linear', curKeys = [], heat = null;
   var HEAT_COL = ['#A7E3CF', '#5FB3C4', '#E5A23A', '#D24545', '#7F1D1D'];
+  var FAULT_ST = { Ende: true }, showFault = true, showSim = false, sim = { d: 10, b: 25, x: 1800 }, chartSim = null;
+  function isSim(st) { return st === 'Ende' && showSim; }
+  function isFault(st) { return !!FAULT_ST[st] && !showSim && !showFault; }
+  function vis(st) { return !FAULT_ST[st] || showFault || showSim; }
+  function mrk(st) { return isSim(st) ? '<span class="sim-tag">Simulation</span>' : FAULT_ST[st] ? '<sup>†</sup>' : ''; }
+  function mrkOld(st) { return isFault(st) ? '<sup>†</sup>' : isSim(st) ? '<span class="sim-tag">Simulation</span>' : ''; }
+  function mkT(st) { return isSim(st) ? ' (Sim.)' : FAULT_ST[st] ? '†' : ''; }
+  function lab(st) { return isSim(st) ? 'Hauserwasser (Simulation aus Mitte, im Mittel ' + num(simMeanFrac() * 100) + ' %)' : LABEL[st]; }
+  function simArr(src) {
+    return (src || []).map(function (d) {
+      var q = qDay(d.date), f = simFrac(sim.d, null, q == null ? Q_ALL : q);
+      return { date: d.date, avgNtu: d.avgNtu * f, minNtu: d.minNtu * f, maxNtu: d.maxNtu * f, avgMg: null, readings: d.readings, cap: 0,
+        ds: (d.ds || 0) * f, dn: d.dn, ns: (d.ns || 0) * f, nn: d.nn };
+    });
+  }
+  function srcData(st) { return isSim(st) ? simArr(RAW_DATA.Mitte) : (RAW_DATA[st] || []); }
+  function measured(st) { var from = periodStart(); return (RAW_DATA[st] || []).filter(function (d) { return d.date >= from; }); }
   function isDim(st) { return focus != null && focus !== st; }
+  function simVs(d) { return 9.81 * (2650 - 1000) * Math.pow(d * 1e-6, 2) / (18 * 1.0e-3); }
+  var Q_ALL = (function () { var s = 0, n = 0; for (var d in RAIN.q) if (RAIN.qUr[d] != null) { s += RAIN.q[d] + RAIN.qUr[d]; n++; } return n ? s / n : 1.5; })();
+  function qDay(date) { return RAIN.q[date] != null && RAIN.qUr[date] != null ? RAIN.q[date] + RAIN.qUr[date] : null; }
+  function qStats() {
+    var from = periodStart(), a = [];
+    for (var d in RAIN.q) if (d >= from && RAIN.qUr[d] != null) a.push(RAIN.q[d] + RAIN.qUr[d]);
+    if (!a.length) return { med: Q_ALL, lo: Q_ALL, hi: Q_ALL, n: 0 };
+    a.sort(function (x, y) { return x - y; });
+    return { med: a[a.length >> 1], lo: a[Math.floor(a.length * 0.1)], hi: a[Math.floor(a.length * 0.9)], n: a.length };
+  }
+  var qRef = Q_ALL;
+  function simL(d, q) { return ((q == null ? qRef : q) / sim.b) / simVs(d); }
+  function simFrac(d, x, q) { return Math.exp(-(x == null ? sim.x : x) / simL(d, q)); }
+  function simMeanFrac() { var a = RAW_DATA.Mitte || [], from = periodStart(), s = 0, t = 0; a.forEach(function (d) { if (d.date < from) return; var q = qDay(d.date); s += d.avgNtu * simFrac(sim.d, null, q == null ? Q_ALL : q); t += d.avgNtu; }); return t ? s / t : simFrac(sim.d); }
+  function dToSlider(d) { return Math.round(Math.log(d / 1) / Math.log(100) * 100); }
+  function sliderToD(v) { var d = Math.pow(100, v / 100); return d < 10 ? Math.round(d * 10) / 10 : Math.round(d); }
   function hexA(hex, a) { return 'rgba(' + parseInt(hex.slice(1, 3), 16) + ',' + parseInt(hex.slice(3, 5), 16) + ',' + parseInt(hex.slice(5, 7), 16) + ',' + a + ')'; }
   function klass(v) { return v > 500 ? 4 : v > 200 ? 3 : v > 50 ? 2 : v > 10 ? 1 : 0; }
 
@@ -498,10 +582,11 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
   });
 
   function filtered() {
-    if (!range) return RAW_DATA;
+    var out = {};
+    if (!range) { ORDER.forEach(function (st) { out[st] = srcData(st); }); return out; }
     var c = toDate(maxDate); c.setDate(c.getDate() - range);
-    var cut = iso(c), out = {};
-    ORDER.forEach(function (st) { out[st] = (RAW_DATA[st] || []).filter(function (d) { return d.date >= cut; }); });
+    var cut = iso(c);
+    ORDER.forEach(function (st) { out[st] = srcData(st).filter(function (d) { return d.date >= cut; }); });
     return out;
   }
   function bucket(data, keyFn) {
@@ -549,22 +634,27 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
       document.getElementById('periodDates').textContent = dmy(day);
       document.getElementById('periodSub').textContent = WD[toDate(day).getDay()] + ' · einzelner Tag';
       S = {}; ORDER.forEach(function (st) {
-        var d = null; (RAW_DATA[st] || []).some(function (x) { if (x.date === day) { d = x; return true; } return false; });
+        var d = null; srcData(st).some(function (x) { if (x.date === day) { d = x; return true; } return false; });
         S[st] = d ? { avg: d.avgNtu, min: d.minNtu, max: d.maxNtu, n: d.readings } : null;
       });
     }
     var h = '', kAvg = S.Krems && S.Krems.avg > 0 ? S.Krems.avg : null, mxAvg = 0;
-    ORDER.forEach(function (st) { if (S[st]) mxAvg = Math.max(mxAvg, S[st].avg); });
+    ORDER.forEach(function (st) { if (S[st] && !isFault(st)) mxAvg = Math.max(mxAvg, S[st].avg); });
     ORDER.forEach(function (st) {
       var s = S[st];
-      h += '<div class="row"><div class="row-name"><span class="dot" style="background:' + COL[st] + '"></span><span>' + NAME[st] + (st === 'Ende' ? '<sup>†</sup>' : '')
-        + (ROLE[st] ? ' <small>' + ROLE[st] + '</small>' : '') + (s ? ' <small>· ' + grade(s.avg) + '</small>' : '') + '</span></div>'
+      h += '<div class="row' + (isFault(st) ? ' fault' : '') + '"><div class="row-name"><span class="dot" style="background:' + COL[st] + '"></span><span>' + NAME[st] + mrk(st)
+        + (ROLE[st] ? ' <small>' + ROLE[st] + '</small>' : '') + (isFault(st) ? '<span class="fault-tag">Sonde fehlerhaft</span>' : s ? ' <small>· ' + grade(s.avg) + '</small>' : '') + '</span></div>'
         + '<div class="row-span">' + (s ? 'Min ' + num(s.min) + ' – Max ' + num(s.max) + ' · ' + (day ? s.n + ' Messungen' : s.days + ' Tage') : 'keine Daten') + '</div>'
-        + (st === 'Krems' ? '<div class="row-fac ref">Referenz</div>' : '<div class="row-fac">' + (s && kAvg ? num(s.avg / kAvg, 1) + '×' : '–') + '</div>')
+        + (st === 'Krems' ? '<div class="row-fac ref">Referenz</div>' : isFault(st) ? '<div class="row-fac ref">nicht verwertbar</div>' : '<div class="row-fac">' + (s && kAvg ? num(s.avg / kAvg, 1) + '×' : '–') + '</div>')
         + '<div class="row-val">' + (s ? num(s.avg, day && s.avg < 100 ? 1 : 0) : '–') + '<span>NTU</span></div>'
-        + '<div class="row-bar"><i style="width:' + (s && mxAvg ? Math.max(0.5, s.avg / mxAvg * 100).toFixed(1) : 0) + '%;background:' + COL[st] + '"></i></div></div>';
+        + '<div class="row-bar"><i style="width:' + (s && mxAvg && !isFault(st) ? Math.max(0.5, s.avg / mxAvg * 100).toFixed(1) : 0) + '%;background:' + COL[st] + '"></i></div></div>';
     });
     document.getElementById('rows').innerHTML = h;
+    document.getElementById('hwNote').innerHTML = showSim
+      ? '<b>Simulation:</b> Die Werte der Station Hauserwasser sind in allen Tabellen und Diagrammen durch eine Modellrechnung ersetzt: Werte der Station Mitte, vermindert um das rechnerische Absinken auf ' + num(sim.x / 1000, 1) + ' Flusskilometern (Korngröße ' + num(sim.d, sim.d < 10 ? 1 : 0) + ' µm, Gewässerbreite ' + num(sim.b) + ' m, täglicher Abfluss der Pegel Kremsmünster und Unterrohr). Im gewählten Zeitraum kommen im Mittel ' + num(simMeanFrac() * 100) + ' % an. Das sind keine Messwerte; die Annahmen stehen im Abschnitt «Simulation».'
+      : showFault
+        ? '† Hauserwasser: Angezeigt sind die Originalwerte der Sonde bei Fischen. Die Sonde wurde als fehlerhaft festgestellt und wird getauscht (Stand 24.11.2026); der Fehler besteht vermutlich seit Beginn der Aufzeichnung. Über «Sonde (fehlerhaft)» lassen sich die Werte ausblenden, über «Simulation» durch eine Modellrechnung aus der Station Mitte ersetzen.'
+        : '† Hauserwasser: Die Sonde bei Fischen ist fehlerhaft und wird getauscht (Stand 24.11.2026). Ihre Werte sind ausgeblendet und fließen nicht in die Vergleiche ein. Über «Hauserwasser: Messwerte» lassen sich die Originalwerte wieder einblenden, über «Simulation» durch eine Modellrechnung ersetzen.';
   }
 
   /* Karte */
@@ -572,7 +662,7 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
     Krems: { nr: 3, x: 80, y: 340, lx: 16, ly: 22, a: 'start', loc: 'Projektbeginn Achleiten' },
     Sulzbach: { nr: 2, x: 300, y: 300, lx: 14, ly: -30, a: 'start', loc: 'im Sulzbach, bei Halbarting' },
     Mitte: { nr: 1, x: 240, y: 170, lx: 18, ly: 6, a: 'start', loc: 'Projektende Krems – Kematen' },
-    Ende: { nr: 4, x: 452, y: 118, lx: 0, ly: 0, a: 'end', loc: 'Krems in Piberbach – Fischen', px: 380, py: 70 }
+    Ende: { nr: 4, x: 452, y: 118, lx: 0, ly: 0, a: 'end', loc: 'Sonde† · an der Obergrenze des Reviers', px: 380, py: 70 }
   };
   function initMap() {
     var NS = 'http://www.w3.org/2000/svg', proj = document.getElementById('mapProj'), len = proj.getTotalLength();
@@ -603,14 +693,14 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
     ORDER.forEach(function (st) {
       var c = MAP[st], s = S[st], col = COL[st], px = c.px || c.x, py = c.py || c.y;
       var tx = c.px ? c.x : c.x + c.lx, ty = c.px ? c.y : c.y + c.ly;
-      var r = s ? Math.max(7, Math.min(34, Math.sqrt(s.avg) * 1.6)) : 0;
-      h += '<g opacity="' + (isDim(st) ? 0.25 : 1) + '">'
+      var r = s && !isFault(st) ? Math.max(7, Math.min(34, Math.sqrt(s.avg) * 1.6)) : 0;
+      h += '<g opacity="' + (isDim(st) || !vis(st) ? 0.3 : 1) + '">'
         + (r ? '<circle cx="' + px + '" cy="' + py + '" r="' + r.toFixed(1) + '" fill="' + col + '" opacity="0.16"/>' : '')
         + '<circle cx="' + px + '" cy="' + py + '" r="8" fill="' + col + '" stroke="#fff" stroke-width="1.5"/>'
         + '<text x="' + px + '" y="' + (py + 3.4) + '" text-anchor="middle" font-size="9.5" font-weight="700" fill="#fff" style="font-family:' + MONO.replace(/"/g, "'") + '">' + c.nr + '</text>'
         + '<text class="m-st" x="' + tx + '" y="' + ty + '" text-anchor="' + c.a + '" fill="' + col + '">' + NAME[st] + '</text>'
-        + '<text class="m-val" x="' + tx + '" y="' + (ty + 13) + '" text-anchor="' + c.a + '">' + (s ? num(s.avg, s.avg < 100 ? 1 : 0) + ' NTU · ' + grade(s.avg) : 'keine Daten') + '</text>'
-        + '<text class="m-loc" x="' + tx + '" y="' + (ty + 25) + '" text-anchor="' + c.a + '">' + c.loc + '</text></g>';
+        + '<text class="m-val" x="' + tx + '" y="' + (ty + 13) + '" text-anchor="' + c.a + '">' + (s ? (isFault(st) ? '(' + num(s.avg) + ' NTU, nicht verwertbar)' : num(s.avg, s.avg < 100 ? 1 : 0) + ' NTU · ' + grade(s.avg)) : 'keine Daten') + '</text>'
+        + '<text class="m-loc" x="' + tx + '" y="' + (ty + 25) + '" text-anchor="' + c.a + '">' + (isSim(st) ? 'Simulation aus Station Mitte' : isFault(st) ? 'Sonde fehlerhaft · ausgeblendet' : c.loc) + '</text></g>';
     });
     document.getElementById('mapStations').innerHTML = h;
   }
@@ -618,12 +708,12 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
   /* Legende */
   function renderLegend() {
     var el = document.getElementById('legend'); el.innerHTML = '';
-    ORDER.forEach(function (st) {
+    ORDER.filter(vis).forEach(function (st) {
       var b = document.createElement('button');
       b.className = 'leg-item' + (isDim(st) ? ' off' : focus === st ? ' on' : '');
       b.setAttribute('aria-pressed', focus === st ? 'true' : 'false');
       b.title = focus === st ? 'Hervorhebung aufheben' : 'Station hervorheben';
-      b.innerHTML = '<i style="background:' + COL[st] + '"></i>' + LABEL[st];
+      b.innerHTML = '<i style="background:' + COL[st] + '"></i>' + lab(st);
       b.onclick = function () { focus = focus === st ? null : st; render(); };
       el.appendChild(b);
     });
@@ -755,15 +845,15 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
     var rawOf = {};
     var set = {}; ORDER.forEach(function (st) { (P[st] || []).forEach(function (d) { set[d.date] = 1; }); });
     var keys = Object.keys(set).sort();
-    var ds = ORDER.map(function (st) {
+    var ds = ORDER.filter(vis).map(function (st) {
       var m = {}; (P[st] || []).forEach(function (d) { m[d.date] = d.avgNtu; });
       var c = isDim(st) ? hexA(COL[st], 0.22) : COL[st];
-      rawOf[LABEL[st]] = keys.map(function (k) { return m[k]; });
-      return { label: LABEL[st], yAxisID: 'y', order: focus === st ? 0 : 1, data: keys.map(function (k) {
+      rawOf[lab(st)] = keys.map(function (k) { return m[k]; });
+      return { label: lab(st), yAxisID: 'y', order: focus === st ? 0 : 1, data: keys.map(function (k) {
           if (REL) return m[k] == null || !(kref[k] > 0) || m[k] <= 0 ? null : m[k] / kref[k];
           return m[k] == null || (LOG && m[k] <= 0) ? null : m[k]; }), borderColor: c, backgroundColor: c,
         borderWidth: focus === st ? 2.25 : isDim(st) ? 1 : st === 'Ende' ? 1.75 : 1.25, pointRadius: view === 'monthly' ? 2.5 : 0, pointHoverRadius: 3.5, pointHoverBorderColor: '#fff', pointHoverBorderWidth: 1.5,
-        fill: false, tension: 0, spanGaps: true };
+        borderDash: isSim(st) ? [5, 3] : [], fill: false, tension: 0, spanGaps: true };
     });
     var hi = 0; ds.forEach(function (d) { d.data.forEach(function (v) { if (v != null && v > hi) hi = v; }); });
     var rainData = keys.map(rainBucket), rainMax = 0; rainData.forEach(function (v) { if (v > rainMax) rainMax = v; });
@@ -812,11 +902,11 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
     var W = wrap.clientWidth, H = wrap.clientHeight, dpr = window.devicePixelRatio || 1, keys = curKeys, n = keys.length;
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-    var L = 100, T = 22, B = 24, gap = 8, rh = (H - T - B - gap * 3) / 4, cw = n ? (W - L) / n : 0;
+    var VS = ORDER.filter(vis), L = 100, T = 22, B = 24, gap = 8, rh = (H - T - B - gap * (VS.length - 1)) / VS.length, cw = n ? (W - L) / n : 0;
     heat = { L: L, T: T, B: B, W: W, H: H, cw: cw, n: n, hover: heat ? heat.hover : -1 };
     if (heat.hover >= n) heat.hover = -1;
     function x0(i) { return Math.round(L + i * cw); }
-    ORDER.forEach(function (st, r) {
+    VS.forEach(function (st, r) {
       var y = T + r * (rh + gap);
       ctx.globalAlpha = isDim(st) ? 0.25 : 1;
       ctx.fillStyle = COL[st]; ctx.beginPath(); ctx.arc(4, y + rh / 2, 4, 0, Math.PI * 2); ctx.fill();
@@ -862,7 +952,7 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
       var k = curKeys[i], r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
       if (heat.hover !== i) { heat.hover = i; drawHeat(); showMap(k); }
       var html = '<strong>' + longLabel(k) + '</strong>';
-      ORDER.forEach(function (st) {
+      ORDER.filter(vis).forEach(function (st) {
         var v = mapIdx[st][k];
         html += '<div><i style="background:' + (v == null ? '#f1f5f9' : HEAT_COL[klass(v)]) + '"></i><span>' + NAME[st] + (v == null ? '' : ' · ' + grade(v)) + '</span><span>' + (v == null ? 'keine Daten' : num(v, 1) + ' NTU') + '</span></div>';
       });
@@ -881,9 +971,9 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
     var M = bucket(F, function (d) { return d.slice(0, 7); }), set = {};
     ORDER.forEach(function (st) { M[st].forEach(function (d) { set[d.date] = 1; }); });
     var keys = Object.keys(set).sort();
-    var ds = ORDER.map(function (st) {
+    var ds = ORDER.filter(vis).map(function (st) {
       var m = {}; M[st].forEach(function (d) { m[d.date] = d.avgNtu; });
-      return { label: LABEL[st], data: keys.map(function (k) { return m[k] == null ? null : m[k]; }), backgroundColor: isDim(st) ? hexA(COL[st], 0.22) : COL[st], borderWidth: 0, borderRadius: 0, categoryPercentage: 0.72, barPercentage: 0.9 };
+      return { label: lab(st), data: keys.map(function (k) { return m[k] == null ? null : m[k]; }), backgroundColor: isDim(st) ? hexA(COL[st], 0.22) : COL[st], borderWidth: 0, borderRadius: 0, categoryPercentage: 0.72, barPercentage: 0.9 };
     });
     if (chartMonthly) chartMonthly.destroy();
     chartMonthly = new Chart(document.getElementById('chartMonthly'), {
@@ -903,13 +993,13 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
 
   /* Matrix */
   function renderStats(S) {
-    var mx = 0; ORDER.forEach(function (st) { if (S[st]) mx = Math.max(mx, S[st].avg); });
+    var mx = 0; ORDER.forEach(function (st) { if (S[st] && !isFault(st)) mx = Math.max(mx, S[st].avg); });
     var h = '';
     ORDER.forEach(function (st) {
       var s = S[st]; if (!s) return;
-      h += '<tr><td><span class="dot" style="background:' + COL[st] + ';margin-right:7px"></span>' + NAME[st] + '<small>' + (ROLE[st] ? ROLE[st] + ' · ' : '') + grade(s.avg) + '</small></td>'
-        + '<td class="avg"><b style="width:' + (s.avg / mx * 100).toFixed(0) + '%;background:' + COL[st] + '"></b><span>' + num(s.avg, 1) + '</span></td>'
-        + '<td>' + (st === 'Krems' ? '1,0' : S.Krems && S.Krems.avg > 0 ? num(s.avg / S.Krems.avg, 1) : '–') + '</td><td>' + num(s.max) + '</td><td>' + (s.cap ? s.cap : '0') + '</td></tr>';
+      h += '<tr' + (isFault(st) ? ' class="fault"' : '') + '><td><span class="dot" style="background:' + COL[st] + ';margin-right:7px"></span>' + NAME[st] + mkT(st) + '<small>' + (isFault(st) ? 'Sonde fehlerhaft, nicht verwertbar' : (ROLE[st] ? ROLE[st] + ' · ' : '') + grade(s.avg)) + '</small></td>'
+        + '<td class="avg"><b style="width:' + (isFault(st) ? 0 : s.avg / mx * 100).toFixed(0) + '%;background:' + COL[st] + '"></b><span>' + num(s.avg, 1) + '</span></td>'
+        + '<td>' + (st === 'Krems' ? '1,0' : isFault(st) ? '–' : S.Krems && S.Krems.avg > 0 ? num(s.avg / S.Krems.avg, 1) : '–') + '</td><td>' + num(s.max) + '</td><td>' + (s.cap ? s.cap : '0') + '</td></tr>';
     });
     document.querySelector('#stats tbody').innerHTML = h;
   }
@@ -921,7 +1011,7 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
       ['Grenzwert Bauphase', 5, 'lim'],
       ['Messbereichsende der Sonden', 1050 * F, 'cap']
     ];
-    ORDER.slice().reverse().forEach(function (st) { if (S[st]) rowsT.push([NAME[st] + ', Ø im Zeitraum', S[st].avg * F, 'st', COL[st]]); });
+    ORDER.slice().reverse().forEach(function (st) { if (S[st] && !isFault(st)) rowsT.push([NAME[st] + mkT(st) + ', Ø im Zeitraum', S[st].avg * F, 'st', COL[st]]); });
     var h2 = '';
     rowsT.forEach(function (r) {
       h2 += '<tr><td>' + r[0] + '</td><td>' + num(r[1], r[1] < 1 ? 2 : 1) + ' g/l</td><td>' + (r[4] ? '–' : num(r[1] / F) + ' NTU') + '</td>'
@@ -929,9 +1019,9 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
     });
     document.querySelector('#scaleTab tbody').innerHTML = h2;
     var parts = [];
-    ORDER.slice().reverse().forEach(function (st) { if (S[st] && S[st].cap) parts.push(NAME[st] + ' ' + S[st].cap + ' Stunden an ' + S[st].capDays + ' Tagen'); });
-    var fl = ORDER.map(function (st) { var a = RAW_DATA[st] || [], n2 = 0, n5 = 0; a.forEach(function (d) { if (d.avgNtu > 200) n2++; if (d.avgNtu > 500) n5++; }); return { st: st, n2: n2, n5: n5 }; });
-    document.getElementById('floodText').textContent = 'Ihr Tagesmittel lag im gesamten Messzeitraum nur an ' + fl[0].n2 + ' Tagen über 200 NTU und nie über 500 NTU. Im selben Zeitraum lagen über 500 NTU: ' + fl.slice(1).map(function (x) { return NAME[x.st] + (x.st === 'Ende' ? '†' : '') + ' an ' + x.n5 + ' Tagen'; }).join(', ') + '.';
+    ORDER.slice().reverse().forEach(function (st) { if (S[st] && S[st].cap && !isFault(st)) parts.push(NAME[st] + ' ' + S[st].cap + ' Stunden an ' + S[st].capDays + ' Tagen'); });
+    var fl = ORDER.map(function (st) { var a = srcData(st), n2 = 0, n5 = 0; a.forEach(function (d) { if (d.avgNtu > 200) n2++; if (d.avgNtu > 500) n5++; }); return { st: st, n2: n2, n5: n5 }; });
+    document.getElementById('floodText').textContent = 'Ihr Tagesmittel lag im gesamten Messzeitraum nur an ' + fl[0].n2 + ' Tagen über 200 NTU und nie über 500 NTU. Im selben Zeitraum lagen über 500 NTU: ' + fl.slice(1).filter(function (x) { return !isFault(x.st); }).map(function (x) { return NAME[x.st] + mkT(x.st) + ' an ' + x.n5 + ' Tagen'; }).join(', ') + '.';
     document.getElementById('capText').textContent = parts.length
       ? 'Im gewählten Zeitraum lagen Stundenwerte am Messbereichsende (≥ 1.040 NTU): ' + parts.join(', ') + '. Wie hoch die Trübung in diesen Stunden tatsächlich war, ist nicht bekannt.'
       : 'Im gewählten Zeitraum lag kein Stundenwert am Messbereichsende (≥ 1.040 NTU).';
@@ -958,7 +1048,7 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
         if (d.avgNtu > 200) { hi++; if (w < 2) hiDry++; }
       });
       var a = dry[1] ? dry[0] / dry[1] : null, b = wet[1] ? wet[0] / wet[1] : null, r = a > 0 && b != null ? b / a : null;
-      h4 += '<tr><td><span class="dot" style="background:' + COL[st] + ';margin-right:7px"></span>' + NAME[st] + (st === 'Ende' ? '<sup>†</sup>' : '') + '</td>'
+      h4 += '<tr><td><span class="dot" style="background:' + COL[st] + ';margin-right:7px"></span>' + NAME[st] + mrk(st) + '</td>'
         + '<td>' + (a == null ? '–' : num(a)) + '</td><td>' + (b == null ? '–' : num(b)) + '</td>'
         + '<td class="' + (r != null && r >= 1.3 ? 'hi' : '') + '">' + (r == null ? '–' : num(r, 2) + '×') + '</td>'
         + '<td>' + hi + '</td><td class="' + (hiDry ? 'hi' : '') + '">' + hiDry + '</td></tr>';
@@ -1019,7 +1109,7 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
         } }
     });
   }
-  var chartPat = null, chartDiu = null;
+  var chartPat = null, chartDiu = null, curS = null;
   function findDrops(arr) {
     var out = [];
     for (var i = 1; i < arr.length; i++) {
@@ -1034,14 +1124,14 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
     return out;
   }
   function renderPattern(F) {
-    var arr = F.Ende || [], drops = findDrops(arr), dry = drops.filter(function (d) { return d.dry; });
+    var arr = measured('Ende'), drops = findDrops(arr), dry = drops.filter(function (d) { return d.dry; });
     var up = 0, down = 0;
     for (var i = 1; i < arr.length; i++) { var r = arr[i].avgNtu / arr[i - 1].avgNtu; if (r > 1.02) up++; else if (r < 0.98) down++; }
     document.getElementById('patSub').textContent = 'Tagesmittel auf logarithmischer Achse · ' + (arr.length ? dmy(arr[0].date) + ' – ' + dmy(arr[arr.length - 1].date) : '') + ' · langsamer Anstieg, plötzlicher Abfall';
     document.getElementById('patNote').textContent = 'Im gewählten Zeitraum stieg das Tagesmittel an ' + up + ' Tagen und fiel an ' + down + ' Tagen. '
       + drops.length + ' Mal fiel es von einem Tag auf den nächsten um mehr als 40 %, davon ' + dry.length + ' Mal ohne Regen (unter 5 mm in drei Tagen) und ohne Abflusswelle'
       + (dry.length ? ': ' + dry.map(function (d) { return dmy(d.date).slice(0, 6) + d.date.slice(2, 4) + ' (' + num(d.from) + ' → ' + num(d.to) + ')'; }).join(', ') : '') + '. '
-      + 'Unvollständige Tage sind nicht gezählt. Ob an diesen Tagen an der Sonde gearbeitet wurde, ist nicht bekannt. † Messwerte unter Vorbehalt.';
+      + 'Unvollständige Tage sind nicht gezählt. Ob an diesen Tagen an der Sonde gearbeitet wurde, ist nicht bekannt. † Sonde fehlerhaft, Werte nicht verwertbar.';
     if (typeof Chart === 'undefined') return;
     var keys = arr.map(function (d) { return d.date; }), mi = {}, dm = {};
     (F.Mitte || []).forEach(function (d) { mi[d.date] = d.avgNtu; });
@@ -1166,6 +1256,64 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
     });
   }
 
+  var simMark = { id: 'simMark', afterDatasetsDraw: function (ch) {
+    var a = ch.chartArea, ctx = ch.ctx;
+    [[1.8, 'Obergrenze Revier'], [4.8, 'Untergrenze']].forEach(function (m) {
+      var x = ch.scales.x.getPixelForValue(m[0]);
+      ctx.save(); ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(x, a.top); ctx.lineTo(x, a.bottom); ctx.stroke();
+      ctx.setLineDash([]); ctx.font = '10px ' + MONO; ctx.fillStyle = '#64748b'; ctx.textAlign = m[0] > 4 ? 'right' : 'left'; ctx.textBaseline = 'top'; ctx.fillText(m[1], x + (m[0] > 4 ? -5 : 5), a.top + 2); ctx.restore();
+    });
+    var xs = ch.scales.x.getPixelForValue(sim.x / 1000), f = simFrac(sim.d), y = ch.scales.y.getPixelForValue(f * 100);
+    ctx.save(); ctx.fillStyle = '#0f172a'; ctx.beginPath(); ctx.arc(xs, y, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.font = '10px ' + MONO; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText(num(sim.x / 1000, 1) + ' km: ' + num(f * 100) + ' %', xs + 8, Math.max(a.top + 24, y - 6)); ctx.restore();
+  } };
+  function renderSim(S) {
+    var qs = qStats(); qRef = qs.med;
+    var vs = simVs(sim.d), L = simL(sim.d), mf = simMeanFrac();
+    function pc(v) { return v * 100 < 1 ? '<1' : num(v * 100); }
+    var pos = sim.x <= 1800 ? 'Obergrenze' : sim.x >= 4800 ? 'Untergrenze' : 'im Revier';
+    document.getElementById('simD').value = dToSlider(sim.d); document.getElementById('simX').value = sim.x; document.getElementById('simB').value = sim.b;
+    document.getElementById('simDv').textContent = num(sim.d, sim.d < 10 ? 1 : 0) + ' µm';
+    document.getElementById('simXv').textContent = pos + ' · ' + num(sim.x / 1000, 1) + ' km ab Projektende';
+    document.getElementById('simBv').textContent = num(sim.b) + ' m';
+    document.getElementById('simVs').textContent = (vs * 1000 < 0.1 ? num(vs * 1000, 3) : num(vs * 1000, 2)) + ' mm/s';
+    document.getElementById('simQ').textContent = qs.n ? num(qs.med, 2) + ' m³/s' : 'kein Pegelwert, Mittel ' + num(Q_ALL, 2) + ' m³/s';
+    document.getElementById('simL').textContent = L < 1000 ? num(L) + ' m' : num(L / 1000, 1) + ' km';
+    document.getElementById('simF3').textContent = pc(simFrac(sim.d, null, qs.lo)) + ' / ' + pc(simFrac(sim.d, null, qs.med)) + ' / ' + pc(simFrac(sim.d, null, qs.hi)) + ' %';
+    document.getElementById('simF').textContent = pc(mf) + ' %';
+    var m = S && S.Mitte ? S.Mitte.avg : null;
+    if (m != null && showSim && S.Ende) { document.getElementById('simAvg').textContent = num(m) + ' → ' + num(S.Ende.avg) + ' NTU'; }
+    else {
+      var a = measured('Mitte'), s2 = 0; a.forEach(function (d) { var q = qDay(d.date); s2 += d.avgNtu * simFrac(sim.d, null, q == null ? Q_ALL : q); });
+      document.getElementById('simAvg').textContent = a.length ? num(s2 / a.length ? (function () { var t = 0; a.forEach(function (d) { t += d.avgNtu; }); return t / a.length; })() : 0) + ' → ' + num(s2 / a.length) + ' NTU' : '–';
+    }
+    function avgFor(d) { var a = measured('Mitte'), s3 = 0; a.forEach(function (x) { var q = qDay(x.date); s3 += x.avgNtu * simFrac(d, null, q == null ? Q_ALL : q); }); return a.length ? s3 / a.length : 0; }
+    document.getElementById('simBand').textContent = num(avgFor(20)) + ' bis ' + num(avgFor(2)) + ' NTU';
+    document.getElementById('simSub').textContent = 'Bei Median-Abfluss ' + num(qs.med, 2) + ' m³/s und ' + num(sim.b) + ' m Breite · gewählte Korngröße ' + num(sim.d, sim.d < 10 ? 1 : 0) + ' µm, dazu Vergleichskurven';
+    Array.prototype.forEach.call(document.querySelectorAll('[data-grain]'), function (b) { b.classList.toggle('active', +b.getAttribute('data-grain') === sim.d); });
+    if (typeof Chart === 'undefined') return;
+    var xs = []; for (var i = 0; i <= 60; i++) xs.push(i / 10);
+    function curve(d) { return xs.map(function (x) { return simFrac(d, x * 1000) * 100; }); }
+    function ref(d, label) { return { label: label, data: curve(d), borderColor: '#94a3b8', backgroundColor: '#94a3b8', borderWidth: 1, borderDash: [3, 3], pointRadius: 0, tension: 0 }; }
+    var data = { labels: xs, datasets: [
+      { label: 'Gewählt: ' + num(sim.d, sim.d < 10 ? 1 : 0) + ' µm', data: curve(sim.d), borderColor: '#0f172a', backgroundColor: '#0f172a', borderWidth: 2, pointRadius: 0, tension: 0 },
+      ref(2, 'Ton 2 µm'), ref(10, 'Feinschluff 10 µm'), ref(20, 'Mittelschluff 20 µm'), ref(63, 'Grobschluff 63 µm')
+    ] };
+    if (chartSim) { chartSim.data = data; chartSim.update('none'); return; }
+    chartSim = new Chart(document.getElementById('chartSim'), {
+      type: 'line', data: data, plugins: [simMark],
+      options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: true, position: 'bottom', labels: { font: { family: SANS, size: 10 }, color: '#475569', boxWidth: 14, boxHeight: 1, padding: 8 } },
+          tooltip: Object.assign(tooltipStyle(), { callbacks: { title: function (it) { return num(+it[0].label, 1) + ' km unterhalb Projektende'; }, label: function (it) { return ' ' + it.dataset.label + '  ' + num(it.parsed.y, it.parsed.y < 10 ? 1 : 0) + ' %'; } } }) },
+        scales: {
+          x: { type: 'linear', min: 0, max: 6, grid: { display: false }, border: { color: '#94a3b8' }, ticks: { color: '#64748b', font: { family: MONO, size: 10 }, stepSize: 1, callback: function (v) { return num(v) + ' km'; } },
+            title: { display: true, text: 'Fließstrecke ab Projektende (Station Mitte)', color: '#64748b', font: { family: MONO, size: 10 } } },
+          y: { min: 0, max: 100, border: { display: false }, grid: { color: '#f1f5f9' }, ticks: { color: '#64748b', font: { family: MONO, size: 10 }, callback: function (v) { return num(v) + ' %'; } },
+            title: { display: true, text: 'verbleibender Anteil', color: '#64748b', font: { family: MONO, size: 10 } } } } }
+    });
+  }
+
   function renderTakt(F) {
     var h3 = '', hits = [], none = [];
     ORDER.forEach(function (st) {
@@ -1178,7 +1326,7 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
       var wk = (b[0][1] + b[1][1]) ? (b[0][0] + b[1][0]) / (b[0][1] + b[1][1]) : null, wE = (b[2][1] + b[3][1]) ? (b[2][0] + b[3][0]) / (b[2][1] + b[3][1]) : null;
       var r = wk != null && wE > 0 ? wk / wE : null;
       if (r != null) { if (r >= 1.3) hits.push(NAME[st] + ' ' + num(r, 1) + '×'); else if (st !== 'Krems') none.push(NAME[st] + ' ' + num(r, 1) + '×'); }
-      h3 += '<tr><td><span class="dot" style="background:' + COL[st] + ';margin-right:7px"></span>' + NAME[st] + (st === 'Ende' ? '<sup>†</sup>' : '') + '</td>'
+      h3 += '<tr><td><span class="dot" style="background:' + COL[st] + ';margin-right:7px"></span>' + NAME[st] + mrk(st) + '</td>'
         + v.map(function (x) { return '<td>' + (x == null ? '–' : num(x)) + '</td>'; }).join('')
         + '<td class="' + (r != null && r >= 1.3 ? 'hi' : '') + '">' + (r == null ? '–' : num(r, 2) + '×') + '</td></tr>';
     });
@@ -1190,7 +1338,7 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
       mm[k][st][i] += (d.ds || 0) + (d.ns || 0); mm[k][st][i + 1] += (d.dn || 0) + (d.nn || 0);
     }); });
     mk.sort();
-    document.querySelector('#taktM thead').innerHTML = '<tr><th>Monat</th>' + ORDER.map(function (st) { return '<th>' + NAME[st] + (st === 'Ende' ? '†' : '') + '</th>'; }).join('') + '</tr>';
+    document.querySelector('#taktM thead').innerHTML = '<tr><th>Monat</th>' + ORDER.map(function (st) { return '<th>' + NAME[st] + mkT(st) + '</th>'; }).join('') + '</tr>';
     document.querySelector('#taktM tbody').innerHTML = mk.map(function (k) {
       return '<tr' + (k === '2026-05' ? ' style="border-top:2px solid var(--s900)"' : '') + '><td>' + MON[+k.slice(5, 7) - 1] + ' ' + k.slice(0, 4) + '</td>' + ORDER.map(function (st) {
         var x = mm[k][st]; if (!x || !x[1] || !x[3] || !(x[2] > 0)) return '<td>–</td>';
@@ -1229,6 +1377,7 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
   }
 
   function render() {
+    qRef = qStats().med;
     var F = filtered(), S = {};
     ORDER.forEach(function (st) { S[st] = stat(F[st]); });
     var P = view === 'weekly' ? bucket(F, monday) : view === 'monthly' ? bucket(F, function (d) { return d.slice(0, 7); }) : F;
@@ -1237,7 +1386,7 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
     var ks = Object.keys(cnt).sort(), full = ks.filter(function (k) { return cnt[k] === ORDER.length; });
     mapDefault = full.length ? full[full.length - 1] : ks[ks.length - 1]; mapKey = undefined;
     curKeys = ks;
-    renderLead(S); renderStats(S); renderNotes(S); renderTakt(F); renderRain(F); renderWeather(); renderQ(F); renderWT(); renderPlaus(); renderPattern(F); showMap(null); renderLegend(); renderLine(P); drawHeat(); renderBars(F);
+    curS = S; renderLead(S); renderStats(S); renderNotes(S); renderSim(S); renderTakt(F); renderRain(F); renderWeather(); renderQ(F); renderWT(); renderPlaus(); renderPattern(F); showMap(null); renderLegend(); renderLine(P); drawHeat(); renderBars(F);
   }
   function pinKey() { return !pinned ? null : view === 'weekly' ? monday(pinned) : view === 'monthly' ? pinned.slice(0, 7) : pinned; }
   function showMap(k) {
@@ -1282,6 +1431,13 @@ const RAIN = {"station":"Kremsmünster (GeoSphere Austria, Station 204)","mm":{"
   bind('data-view', function (v) { view = v; });
   bind('data-mode', function (v) { mode = v; });
   bind('data-scale', function (v) { scale = v; });
+  bind('data-hw', function (v) { showFault = v === 'meas'; showSim = v === 'sim'; if (focus && !vis(focus)) focus = null; });
+  var simTimer = null;
+  function simChanged() { renderSim(curS); if (showSim) { clearTimeout(simTimer); simTimer = setTimeout(render, 80); } }
+  document.getElementById('simD').addEventListener('input', function (e) { sim.d = sliderToD(+e.target.value); simChanged(); });
+  document.getElementById('simX').addEventListener('input', function (e) { sim.x = +e.target.value; simChanged(); });
+  document.getElementById('simB').addEventListener('input', function (e) { sim.b = +e.target.value; simChanged(); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-grain]'), function (b) { b.onclick = function () { sim.d = +b.getAttribute('data-grain'); simChanged(); }; });
   var refBtn = document.getElementById('refBtn'), refPop = document.getElementById('refPop');
   function setRef(o) { refPop.classList.toggle('open', o); refBtn.setAttribute('aria-expanded', o ? 'true' : 'false'); }
   refBtn.onclick = function (e) { e.stopPropagation(); setRef(!refPop.classList.contains('open')); };
