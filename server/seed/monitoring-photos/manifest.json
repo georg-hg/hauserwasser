@@ -1,4 +1,42 @@
 [
-  { "file": "IMG_9381.jpg", "originalName": "IMG_9381.HEIC", "date": "2026-11-24", "time": "16:20", "location": "Hauserwasser (Krems)", "note": "Trübes, braunes Wasser mit Schaumflocken." },
-  { "file": "IMG_9382.jpg", "originalName": "IMG_9382.HEIC", "date": "2026-11-24", "time": "16:20", "location": "Hauserwasser (Krems)", "note": "Trübes Wasser an der Kiesbank." }
+  {
+    "file": "IMG_9381.jpg",
+    "originalName": "IMG_9381.HEIC",
+    "date": "2026-11-24",
+    "time": "16:20",
+    "location": "Hauserwasser (Krems)",
+    "note": "Trübes, braunes Wasser mit Schaumflocken."
+  },
+  {
+    "file": "IMG_9382.jpg",
+    "originalName": "IMG_9382.HEIC",
+    "date": "2026-11-24",
+    "time": "16:20",
+    "location": "Hauserwasser (Krems)",
+    "note": "Trübes Wasser an der Kiesbank."
+  },
+  {
+    "file": "2026-11-25_1.jpg",
+    "date": "2026-11-25",
+    "location": "Hauserwasser (Krems)",
+    "note": "Nachmittags. Trübes Wasser an der Insel."
+  },
+  {
+    "file": "2026-11-25_2.jpg",
+    "date": "2026-11-25",
+    "location": "Hauserwasser (Krems)",
+    "note": "Nachmittags. Trübes Wasser an der Insel, Blick vom Ufer."
+  },
+  {
+    "file": "2026-11-25_3.jpg",
+    "date": "2026-11-25",
+    "location": "Hauserwasser (Krems)",
+    "note": "Nachmittags. Trübes Wasser auf ganzer Flussbreite."
+  },
+  {
+    "file": "2026-11-25_4.jpg",
+    "date": "2026-11-25",
+    "location": "Hauserwasser (Krems)",
+    "note": "Nachmittags. Trübes Wasser an der Wehrkrone."
+  }
 ]
